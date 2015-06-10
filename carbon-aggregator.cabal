@@ -21,6 +21,8 @@ library
   build-depends:
     base >=4.7 && <4.8,
     regex-posix ==0.95.*,
+    bytestring ==0.10.*,
+    stringsearch ==0.3.6.6,
     split ==0.2.2
   ghc-prof-options: -auto-all -prof
   ghc-options: -Wall
@@ -53,6 +55,8 @@ test-suite tests
     base -any,
     carbon-aggregator -any,
     regex-posix -any,
+    bytestring -any,
+    stringsearch -any,
     split -any,
     hspec ==2.*,
     HUnit -any,

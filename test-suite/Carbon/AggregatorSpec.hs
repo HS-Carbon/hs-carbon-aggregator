@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Carbon.AggregatorSpec (spec) where
 
 import Carbon.Aggregator
