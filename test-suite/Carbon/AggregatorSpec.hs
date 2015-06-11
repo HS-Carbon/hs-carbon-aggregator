@@ -9,10 +9,6 @@ import Test.Hspec
 spec :: Spec
 spec = do
 
-    describe "main" $ do
-        it "returns the unit" $
-            main `shouldReturn` ()
-
     describe "rule" $ do
         describe "simple aggregateMetric" $ do
             let method = Avg

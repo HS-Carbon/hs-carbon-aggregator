@@ -1,6 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Carbon.Aggregator (module Carbon.Aggregator) where
+module Carbon.Aggregator (
+                           Rule(..)
+                         , InputPattern
+                         , OutputPattern
+                         , AggregationMethod(..)
+                         , AggregationFrequency
+
+                         , SourceMetricName
+                         , AggregatedMetricName
+                         , aggregateMetric
+                         ) where
 
 import Text.Regex.Posix
 import Data.ByteString (ByteString)
@@ -8,9 +18,6 @@ import qualified Data.ByteString as B
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Search (split, replace)
 import Control.Applicative
-
-main :: IO ()
-main = return ()
 
 type InputPattern = ByteString
 type OutputPattern = ByteString
@@ -24,7 +31,9 @@ type AggregatedMetricName = ByteString
 aggregateMetric :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
 aggregateMetric (Rule inp outp _ _) sm = do
     let regex = buildRegex inp outp
-    if sm =~ regex then return outp else Nothing
+    if sm =~ regex
+        then Just outp
+        else Nothing
 
 buildRegex :: InputPattern -> OutputPattern -> ByteString
 buildRegex inp _ = B.concat ["^", (B.intercalate "\\." regex_pattern_parts), "$"]
