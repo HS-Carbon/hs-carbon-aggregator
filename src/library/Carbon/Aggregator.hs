@@ -50,6 +50,15 @@ parseRuleDefinition rulestr = do
     let pattern = B.intercalate "\\s+" ["(.+?)", "\\((\\d+)\\)", "=", "(.+?)", "(.+)"]
     matches <- rulestr =~~ pattern
     -- first element is the source string, so drop it
-    let [outp, sfreq, _, inp] = tail $ head matches
+    let [outp, sfreq, smethod, inp] = tail $ head matches
     freq <- fst <$> readInt sfreq
-    return $ Rule inp outp Sum freq
+    method <- readMethod smethod
+    return $ Rule inp outp method freq
+
+readMethod :: Monad m => ByteString -> m AggregationMethod
+readMethod "sum"   = return Sum
+readMethod "avg"   = return Avg
+readMethod "min"   = return Min
+readMethod "max"   = return Max
+readMethod "count" = return Count
+readMethod _       = fail "Aggregation method not recognized"

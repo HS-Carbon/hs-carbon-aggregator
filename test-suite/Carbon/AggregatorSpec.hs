@@ -29,9 +29,13 @@ spec = do
                 aggregateMetric rule999 "hosts.abc.hist.p999" `shouldBe` Just "aggregated.hist.p999"
 
     describe "parser" $ do
-        it "parses correct rule" $ do
+        it "parses correct Sum rule" $ do
             parseRuleDefinition "outp (10) = sum inp" `shouldBe` Just (Rule "inp" "outp" Sum 10)
+        it "parses correct Count rule" $ do
+            parseRuleDefinition "outp (10) = count inp" `shouldBe` Just (Rule "inp" "outp" Count 10)
         it "returns Nothing for malformed rule" $ do
             parseRuleDefinition "outp (10) = inp" `shouldBe` Nothing
+        it "returns Nothing for malformed aggregation method" $ do
+            parseRuleDefinition "outp (10) = unknown inp" `shouldBe` Nothing
         it "return Nothing for incorrect aggregation frequency" $ do
             parseRuleDefinition "outp (a) = sum inp" `shouldBe` Nothing
