@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Carbon.AggregatorSpec (spec) where
 
 import Carbon.Aggregator
 
 import Test.Hspec
+
+deriving instance Eq Rule
 
 spec :: Spec
 spec = do
@@ -24,3 +27,11 @@ spec = do
             it "should calculate rule999 correctly" $ do
                 aggregateMetric rule99 "hosts.abc.hist.p999" `shouldBe` Nothing
                 aggregateMetric rule999 "hosts.abc.hist.p999" `shouldBe` Just "aggregated.hist.p999"
+
+    describe "parser" $ do
+        it "parses correct rule" $ do
+            parseRuleDefinition "outp (10) = sum inp" `shouldBe` Just (Rule "inp" "outp" Sum 10)
+        it "returns Nothing for malformed rule" $ do
+            parseRuleDefinition "outp (10) = inp" `shouldBe` Nothing
+        it "return Nothing for incorrect aggregation frequency" $ do
+            parseRuleDefinition "outp (a) = sum inp" `shouldBe` Nothing

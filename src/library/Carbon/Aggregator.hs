@@ -6,15 +6,17 @@ module Carbon.Aggregator (
                          , OutputPattern
                          , AggregationMethod(..)
                          , AggregationFrequency
+                         , parseRuleDefinition
 
                          , SourceMetricName
                          , AggregatedMetricName
                          , aggregateMetric
                          ) where
 
-import Text.Regex.Posix
+import Text.Regex.PCRE
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import Data.ByteString.Char8 (readInt)
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Search (split, replace)
 import Control.Applicative
@@ -42,3 +44,12 @@ buildRegex inp _ = B.concat ["^", (B.intercalate "\\." regex_pattern_parts), "$"
 
 strictReplace :: ByteString -> ByteString -> ByteString -> ByteString
 strictReplace old new str = toStrict $ replace old new str
+
+parseRuleDefinition :: ByteString -> Maybe Rule
+parseRuleDefinition rulestr = do
+    let pattern = B.intercalate "\\s+" ["(.+?)", "\\((\\d+)\\)", "=", "(.+?)", "(.+)"]
+    matches <- rulestr =~~ pattern
+    -- first element is the source string, so drop it
+    let [outp, sfreq, _, inp] = tail $ head matches
+    freq <- fst <$> readInt sfreq
+    return $ Rule inp outp Sum freq
