@@ -27,8 +27,20 @@ spec = do
 
         it "emmits events" $ do
             let Just modResult = computeAggregated 5 112 metricBuf
-            emittedEvents modResult `shouldBe` [("metric.path", DataPoint 100 42)]
+            emittedDataPoints modResult `shouldBe` [DataPoint 100 42]
 
         it "drops outdated intervals" $ do
             let Just modResult = computeAggregated 1 1000 metricBuf
             metricBuffers modResult `shouldBe` metricBufEmpty
+            emittedDataPoints modResult `shouldBe` []
+
+        it "doesn't emit duplicates" $ do
+            let Just modResult = computeAggregated 5 112 metricBuf
+            -- No new DataPoints added - nothing to emit
+            computeAggregated 5 120 (metricBuffers modResult) `shouldBe` Nothing
+
+        it "emits aggregated interval if data added" $ do
+            let Just modResult = computeAggregated 5 112 metricBuf
+            let metricBuf' = appendDataPoint (metricBuffers modResult) DataPoint { timestamp = 103, value = 24 }
+            let Just modResult' = computeAggregated 5 122 metricBuf'
+            emittedDataPoints modResult' `shouldBe` [DataPoint 100 42]

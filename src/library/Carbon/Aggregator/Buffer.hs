@@ -20,38 +20,60 @@ data DataPoint = DataPoint { timestamp :: Timestamp, value :: MetricValue }
 
 type MetricPath = ByteString
 type Interval = Int
-type Buffer = [MetricValue]
+type Buffer = (Bool, [MetricValue])
 type IntervalBuffers = Map Interval Buffer
-data MetricBuffers = MetricBuffers { path :: MetricPath, frequency :: AggregationFrequency, intervalBuffers :: IntervalBuffers }
+data MetricBuffers = MetricBuffers { path :: MetricPath, frequency :: AggregationFrequency, intervalBuffers :: IntervalBuffers, hasUnprocessedData :: Bool }
 
-data ModificationResult = ModificationResult { metricBuffers :: MetricBuffers, emittedEvents :: [(MetricPath, DataPoint)] }
+data ModificationResult = ModificationResult { metricBuffers :: MetricBuffers, emittedDataPoints :: [DataPoint] }
 
 bufferFor :: MetricPath -> AggregationFrequency -> MetricBuffers
-bufferFor path freq = MetricBuffers path freq Map.empty
+bufferFor path freq = MetricBuffers path freq Map.empty False
 
 appendDataPoint :: MetricBuffers -> DataPoint -> MetricBuffers
-appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency newBuf
+appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency newBuf True
     where newBuf = appendBufferDataPoint frequency dp intervalBuffers
 
 appendBufferDataPoint :: AggregationFrequency -> DataPoint -> IntervalBuffers -> IntervalBuffers
-appendBufferDataPoint freq DataPoint{..} bufs = Map.insertWith (++) interval [value] bufs
+appendBufferDataPoint freq DataPoint{..} bufs = Map.insertWith appendBuffer interval (True, [value]) bufs
     where interval = timestamp `quot` freq
+          appendBuffer (_, newVals) (_, oldVals) = (True, oldVals ++ newVals)
 
 -- Check if there are data point ready to be emitted. If there aren't any, Nothing is returned.
 computeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
 computeAggregated maxIntervals now mbufs
     -- No buffers - nothing to return
     | Map.null $ intervalBuffers mbufs = Nothing
-    | otherwise = do
-        let currentInterval = now `quot` frequency mbufs
-        --let ageThreshold = currentInterval - maxIntervals * frequency mbufs
-        let thresholdInterval = currentInterval - maxIntervals
-        -- Split buffers into those that passed age threshold and those that didn't.
-        let (_, newBufs) = Map.split (thresholdInterval) (intervalBuffers mbufs)
-        -- We are interested only in the "fresh" part and can safely drop old one unevaluated.
-        let events = Map.foldrWithKey appendIntervalDps [] newBufs
-        let mbufs' = MetricBuffers { path = path mbufs, frequency = frequency mbufs, intervalBuffers = newBufs}
-        return $ ModificationResult mbufs' events
-        where
-            appendIntervalDps interval buf dps = dps ++ [bufDps interval buf]
-            bufDps interval buf = (path mbufs, DataPoint (interval * frequency mbufs) (head buf))
+    | otherwise = doComputeAggregated maxIntervals now mbufs
+
+doComputeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
+doComputeAggregated maxIntervals now mbufs = do
+    let currentInterval = now `quot` frequency mbufs
+    let thresholdInterval = currentInterval - maxIntervals
+    -- Split buffers into those that passed age threshold and those that didn't.
+    let (outdatedBufs, freshBufs) = Map.split thresholdInterval (intervalBuffers mbufs)
+
+    -- No outdated buffers, no unprocessed data - nothing to return.
+    if (Map.null outdatedBufs) && (not $ hasUnprocessedData mbufs)
+        then Nothing
+        else do
+            let dps = computeDataPoints freshBufs
+            let mbufs' = MetricBuffers {
+                            path = path mbufs,
+                            frequency = frequency mbufs,
+                            intervalBuffers = deactivate freshBufs,
+                            hasUnprocessedData = False }
+            return $ ModificationResult mbufs' dps
+
+    where
+        computeDataPoints :: IntervalBuffers -> [DataPoint]
+        computeDataPoints = Map.foldrWithKey appendActiveDps []
+
+        appendActiveDps :: Interval -> Buffer -> [DataPoint] -> [DataPoint]
+        appendActiveDps _ (False, _) dps = dps
+        appendActiveDps interval (True, vals) dps = dps ++ [bufferDp interval vals]
+
+        bufferDp :: Interval -> [MetricValue] -> DataPoint
+        bufferDp interval buf = DataPoint (interval * frequency mbufs) (head buf)
+
+        deactivate :: IntervalBuffers -> IntervalBuffers
+        deactivate = Map.map (\(_, vals) -> (False, vals))
