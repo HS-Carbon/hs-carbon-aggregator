@@ -44,4 +44,4 @@ spec = do
             let Just modResult = computeAggregated 5 112 metricBuf
             let metricBuf' = appendDataPoint (metricBuffers modResult) DataPoint { timestamp = 103, value = 24 }
             let Just modResult' = computeAggregated 5 122 metricBuf'
-            emittedDataPoints modResult' `shouldBe` [DataPoint 100 42]
+            emittedDataPoints modResult' `shouldBe` [DataPoint 100 66]

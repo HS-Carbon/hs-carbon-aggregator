@@ -10,7 +10,7 @@ module Carbon.Aggregator.Buffer (
                                 ) where
 
 import Data.ByteString (ByteString)
-import Carbon.Aggregator (AggregationFrequency, AggregationMethod)
+import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -80,7 +80,15 @@ doComputeAggregated maxIntervals now mbufs = do
         appendActiveDps interval (True, vals) dps = dps ++ [bufferDp interval vals]
 
         bufferDp :: Interval -> [MetricValue] -> DataPoint
-        bufferDp interval buf = DataPoint (interval * frequency mbufs) (head buf)
+        bufferDp interval vals = DataPoint (interval * frequency mbufs) (aggreagte vals)
+
+        aggreagte :: [MetricValue] -> MetricValue
+        aggreagte = aggregateWith $ aggregationMethod mbufs
+            where aggregateWith Sum   vals = sum vals
+                  aggregateWith Avg   vals = sum vals / (realToFrac $ length vals)
+                  aggregateWith Min   vals = minimum vals
+                  aggregateWith Max   vals = maximum vals
+                  aggregateWith Count vals = realToFrac $ length vals
 
         deactivate :: IntervalBuffers -> IntervalBuffers
         deactivate = Map.map (\(_, vals) -> (False, vals))
