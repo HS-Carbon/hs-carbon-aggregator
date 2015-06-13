@@ -3,6 +3,7 @@
 
 module Carbon.Aggregator.BufferSpec (spec) where
 
+import Carbon.Aggregator
 import Carbon.Aggregator.Buffer
 
 import Test.Hspec
@@ -17,12 +18,12 @@ deriving instance Eq DataPoint
 spec :: Spec
 spec = do
     describe "empty MetricBuffers" $ do
-        let metricBuf = bufferFor "metric.path" 10
+        let metricBuf = bufferFor "metric.path" 10 Sum
         it "don't emmit events" $ do
             computeAggregated 1 100 metricBuf `shouldBe` Nothing
 
     describe "MetricBuffers" $ do
-        let metricBufEmpty = bufferFor "metric.path" 10
+        let metricBufEmpty = bufferFor "metric.path" 10 Sum
         let metricBuf = appendDataPoint metricBufEmpty DataPoint { timestamp = 102, value = 42 }
 
         it "emmits events" $ do

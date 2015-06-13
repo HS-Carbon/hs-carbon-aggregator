@@ -10,7 +10,7 @@ module Carbon.Aggregator.Buffer (
                                 ) where
 
 import Data.ByteString (ByteString)
-import Carbon.Aggregator (AggregationFrequency)
+import Carbon.Aggregator (AggregationFrequency, AggregationMethod)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -22,15 +22,21 @@ type MetricPath = ByteString
 type Interval = Int
 type Buffer = (Bool, [MetricValue])
 type IntervalBuffers = Map Interval Buffer
-data MetricBuffers = MetricBuffers { path :: MetricPath, frequency :: AggregationFrequency, intervalBuffers :: IntervalBuffers, hasUnprocessedData :: Bool }
+data MetricBuffers = MetricBuffers {
+    path :: MetricPath,
+    frequency :: AggregationFrequency,
+    aggregationMethod :: AggregationMethod,
+    intervalBuffers :: IntervalBuffers,
+    hasUnprocessedData :: Bool
+}
 
 data ModificationResult = ModificationResult { metricBuffers :: MetricBuffers, emittedDataPoints :: [DataPoint] }
 
-bufferFor :: MetricPath -> AggregationFrequency -> MetricBuffers
-bufferFor path freq = MetricBuffers path freq Map.empty False
+bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> MetricBuffers
+bufferFor path freq aggmethod = MetricBuffers path freq aggmethod Map.empty False
 
 appendDataPoint :: MetricBuffers -> DataPoint -> MetricBuffers
-appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency newBuf True
+appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency aggregationMethod newBuf True
     where newBuf = appendBufferDataPoint frequency dp intervalBuffers
 
 appendBufferDataPoint :: AggregationFrequency -> DataPoint -> IntervalBuffers -> IntervalBuffers
@@ -60,6 +66,7 @@ doComputeAggregated maxIntervals now mbufs = do
             let mbufs' = MetricBuffers {
                             path = path mbufs,
                             frequency = frequency mbufs,
+                            aggregationMethod = aggregationMethod mbufs,
                             intervalBuffers = deactivate freshBufs,
                             hasUnprocessedData = False }
             return $ ModificationResult mbufs' dps
