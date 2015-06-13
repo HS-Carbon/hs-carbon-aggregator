@@ -17,12 +17,14 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
-    Carbon.Aggregator
+    Carbon.Aggregator,
+    Carbon.Aggregator.Buffer
   build-depends:
     base >=4.7 && <4.8,
     regex-pcre-builtin ==0.94.*,
     bytestring ==0.10.*,
     stringsearch ==0.3.6.6,
+    containers ==0.5.*,
     split ==0.2.2
   ghc-prof-options: -auto-all -prof
   ghc-options: -Wall
@@ -58,6 +60,7 @@ test-suite tests
     bytestring -any,
     stringsearch -any,
     split -any,
+    containers -any,
     hspec ==2.*,
     HUnit -any,
     QuickCheck -any
