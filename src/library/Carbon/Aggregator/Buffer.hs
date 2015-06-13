@@ -24,7 +24,7 @@ type Buffer = [MetricValue]
 type IntervalBuffers = Map Interval Buffer
 data MetricBuffers = MetricBuffers { path :: MetricPath, frequency :: AggregationFrequency, intervalBuffers :: IntervalBuffers }
 
-data ModificationResult = ModificationResult MetricBuffers [(MetricPath, DataPoint)]
+data ModificationResult = ModificationResult { metricBuffers :: MetricBuffers, emittedEvents :: [(MetricPath, DataPoint)] }
 
 bufferFor :: MetricPath -> AggregationFrequency -> MetricBuffers
 bufferFor path freq = MetricBuffers path freq Map.empty
@@ -39,7 +39,19 @@ appendBufferDataPoint freq DataPoint{..} bufs = Map.insertWith (++) interval [va
 
 -- Check if there are data point ready to be emitted. If there aren't any, Nothing is returned.
 computeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
-computeAggregated _ _ mbufs
+computeAggregated maxIntervals now mbufs
     -- No buffers - nothing to return
     | Map.null $ intervalBuffers mbufs = Nothing
-    | otherwise = error "Not implemented"
+    | otherwise = do
+        let currentInterval = now `quot` frequency mbufs
+        --let ageThreshold = currentInterval - maxIntervals * frequency mbufs
+        let thresholdInterval = currentInterval - maxIntervals
+        -- Split buffers into those that passed age threshold and those that didn't.
+        let (_, newBufs) = Map.split (thresholdInterval) (intervalBuffers mbufs)
+        -- We are interested only in the "fresh" part and can safely drop old one unevaluated.
+        let events = Map.foldrWithKey appendIntervalDps [] newBufs
+        let mbufs' = MetricBuffers { path = path mbufs, frequency = frequency mbufs, intervalBuffers = newBufs}
+        return $ ModificationResult mbufs' events
+        where
+            appendIntervalDps interval buf dps = dps ++ [bufDps interval buf]
+            bufDps interval buf = (path mbufs, DataPoint (interval * frequency mbufs) (head buf))
