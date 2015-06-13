@@ -52,23 +52,18 @@ computeAggregated maxIntervals now mbufs
     | otherwise = doComputeAggregated maxIntervals now mbufs
 
 doComputeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
-doComputeAggregated maxIntervals now mbufs = do
-    let currentInterval = now `quot` frequency mbufs
+doComputeAggregated maxIntervals now mbufs@MetricBuffers{..} = do
+    let currentInterval = now `quot` frequency
     let thresholdInterval = currentInterval - maxIntervals
     -- Split buffers into those that passed age threshold and those that didn't.
-    let (outdatedBufs, freshBufs) = Map.split thresholdInterval (intervalBuffers mbufs)
+    let (outdatedBufs, freshBufs) = Map.split thresholdInterval intervalBuffers
 
     -- No outdated buffers, no unprocessed data - nothing to return.
-    if (Map.null outdatedBufs) && (not $ hasUnprocessedData mbufs)
+    if (Map.null outdatedBufs) && (not hasUnprocessedData)
         then Nothing
         else do
             let dps = computeDataPoints freshBufs
-            let mbufs' = MetricBuffers {
-                            path = path mbufs,
-                            frequency = frequency mbufs,
-                            aggregationMethod = aggregationMethod mbufs,
-                            intervalBuffers = deactivate freshBufs,
-                            hasUnprocessedData = False }
+            let mbufs' = mbufs{ intervalBuffers = deactivate freshBufs, hasUnprocessedData = False }
             return $ ModificationResult mbufs' dps
 
     where
@@ -80,10 +75,10 @@ doComputeAggregated maxIntervals now mbufs = do
         appendActiveDps interval (True, vals) dps = dps ++ [bufferDp interval vals]
 
         bufferDp :: Interval -> [MetricValue] -> DataPoint
-        bufferDp interval vals = DataPoint (interval * frequency mbufs) (aggreagte vals)
+        bufferDp interval vals = DataPoint (interval * frequency) (aggreagte vals)
 
         aggreagte :: [MetricValue] -> MetricValue
-        aggreagte = aggregateWith $ aggregationMethod mbufs
+        aggreagte = aggregateWith aggregationMethod
             where aggregateWith Sum   vals = sum vals
                   aggregateWith Avg   vals = sum vals / (realToFrac $ length vals)
                   aggregateWith Min   vals = minimum vals
