@@ -19,7 +19,8 @@ library
   exposed-modules:
     Carbon,
     Carbon.Aggregator,
-    Carbon.Aggregator.Buffer
+    Carbon.Aggregator.Buffer,
+    Carbon.Aggregator.Processor
   build-depends:
     base >=4.7 && <4.8,
     regex-pcre-builtin ==0.94.*,
