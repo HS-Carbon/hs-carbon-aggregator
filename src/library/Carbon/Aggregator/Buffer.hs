@@ -9,16 +9,11 @@ module Carbon.Aggregator.Buffer (
                                 , computeAggregated
                                 ) where
 
-import Data.ByteString (ByteString)
+import Carbon
 import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-type Timestamp = Int
-type MetricValue = Double
-data DataPoint = DataPoint { timestamp :: Timestamp, value :: MetricValue }
-
-type MetricPath = ByteString
 type Interval = Int
 type Buffer = (Bool, [MetricValue])
 type IntervalBuffers = Map Interval Buffer

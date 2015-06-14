@@ -20,6 +20,7 @@ import Data.ByteString.Char8 (readInt)
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Search (split, replace)
 import Control.Applicative
+import Carbon
 
 type InputPattern = ByteString
 type OutputPattern = ByteString
@@ -28,8 +29,8 @@ type AggregationFrequency = Int
 
 data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequency deriving (Show)
 
-type SourceMetricName = ByteString
-type AggregatedMetricName = ByteString
+type SourceMetricName = MetricPath
+type AggregatedMetricName = MetricPath
 aggregateMetric :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
 aggregateMetric (Rule inp outp _ _) sm = do
     let regex = buildRegex inp outp
