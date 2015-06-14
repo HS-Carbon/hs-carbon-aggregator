@@ -68,11 +68,11 @@ doComputeAggregated maxIntervals now mbufs@MetricBuffers{..} = do
 
     where
         computeDataPoints :: IntervalBuffers -> [DataPoint]
-        computeDataPoints = Map.foldrWithKey appendActiveDps []
+        computeDataPoints = Map.foldWithKey appendActiveDps []
 
         appendActiveDps :: Interval -> Buffer -> [DataPoint] -> [DataPoint]
         appendActiveDps _ (False, _) dps = dps
-        appendActiveDps interval (True, vals) dps = dps ++ [bufferDp interval vals]
+        appendActiveDps interval (True, vals) dps = (bufferDp interval vals) : dps
 
         bufferDp :: Interval -> [MetricValue] -> DataPoint
         bufferDp interval vals = DataPoint (interval * frequency) (aggreagte vals)

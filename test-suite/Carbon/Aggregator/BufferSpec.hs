@@ -19,14 +19,14 @@ spec :: Spec
 spec = do
     describe "empty MetricBuffers" $ do
         let metricBuf = bufferFor "metric.path" 10 Sum
-        it "don't emmit events" $ do
+        it "don't emit events" $ do
             computeAggregated 1 100 metricBuf `shouldBe` Nothing
 
     describe "MetricBuffers" $ do
         let metricBufEmpty = bufferFor "metric.path" 10 Sum
         let metricBuf = appendDataPoint metricBufEmpty DataPoint { timestamp = 102, value = 42 }
 
-        it "emmits events" $ do
+        it "emits events" $ do
             let Just modResult = computeAggregated 5 112 metricBuf
             emittedDataPoints modResult `shouldBe` [DataPoint 100 42]
 
@@ -45,3 +45,8 @@ spec = do
             let metricBuf' = appendDataPoint (metricBuffers modResult) DataPoint { timestamp = 103, value = 24 }
             let Just modResult' = computeAggregated 5 122 metricBuf'
             emittedDataPoints modResult' `shouldBe` [DataPoint 100 66]
+
+        it "emits data point per interval" $ do
+            let metricBuf' = appendDataPoint metricBuf DataPoint { timestamp = 110, value = 24}
+            let Just modResult = computeAggregated 5 112 metricBuf'
+            emittedDataPoints modResult `shouldBe` [DataPoint 100 42, DataPoint 110 24]
