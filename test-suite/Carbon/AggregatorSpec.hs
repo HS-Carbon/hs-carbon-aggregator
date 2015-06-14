@@ -21,12 +21,12 @@ spec = do
             let rule999 = Rule "hosts.*.hist.p999" "aggregated.hist.p999" method frequency
 
             it "should calculate rule99 correctly" $ do
-                aggregateMetric rule99 "hosts.abc.hist.p99" `shouldBe` Just "aggregated.hist.p99"
-                aggregateMetric rule999 "hosts.abc.hist.p99" `shouldBe` Nothing
+                aggregateMetric "hosts.abc.hist.p99" rule99 `shouldBe` Just "aggregated.hist.p99"
+                aggregateMetric "hosts.abc.hist.p99" rule999 `shouldBe` Nothing
 
             it "should calculate rule999 correctly" $ do
-                aggregateMetric rule99 "hosts.abc.hist.p999" `shouldBe` Nothing
-                aggregateMetric rule999 "hosts.abc.hist.p999" `shouldBe` Just "aggregated.hist.p999"
+                aggregateMetric "hosts.abc.hist.p999" rule99 `shouldBe` Nothing
+                aggregateMetric "hosts.abc.hist.p999" rule999 `shouldBe` Just "aggregated.hist.p999"
 
     describe "parser" $ do
         it "parses correct Sum rule" $ do

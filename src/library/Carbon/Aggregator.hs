@@ -31,8 +31,8 @@ data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequen
 
 type SourceMetricName = MetricPath
 type AggregatedMetricName = MetricPath
-aggregateMetric :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
-aggregateMetric (Rule inp outp _ _) sm = do
+aggregateMetric :: SourceMetricName -> Rule -> Maybe AggregatedMetricName
+aggregateMetric sm (Rule inp outp _ _) = do
     let regex = buildRegex inp outp
     if sm =~ regex
         then Just outp
