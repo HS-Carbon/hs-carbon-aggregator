@@ -6,6 +6,8 @@ module Carbon.Aggregator (
                          , OutputPattern
                          , AggregationMethod(..)
                          , AggregationFrequency
+                         , aggregationMethod
+                         , aggregationFrequency
                          , parseRuleDefinition
 
                          , SourceMetricName
@@ -28,6 +30,12 @@ data AggregationMethod = Sum | Avg | Min | Max | Count deriving (Show, Eq)
 type AggregationFrequency = Int
 
 data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequency deriving (Show)
+
+aggregationMethod :: Rule -> AggregationMethod
+aggregationMethod (Rule _ _ method _) = method
+
+aggregationFrequency :: Rule -> AggregationFrequency
+aggregationFrequency (Rule _ _ _ freq) = freq
 
 type SourceMetricName = MetricPath
 type AggregatedMetricName = MetricPath
