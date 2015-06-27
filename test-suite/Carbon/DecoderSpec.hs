@@ -21,3 +21,7 @@ spec = do
 
         it "ignores incorrect input" $ do
             decodePlainText "garbage" `shouldBe` Nothing
+
+        it "ignores incorrect numbers" $ do
+            -- It isn't necessary, but why not?
+            decodePlainText "metric 4a 1000b" `shouldBe` Just ("metric", DataPoint 1000 4)
