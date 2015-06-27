@@ -14,6 +14,9 @@ import Carbon.Aggregator.Buffer
 
 type BuffersManager = Map MetricPath MetricBuffers
 
+newBuffersManager :: BuffersManager
+newBuffersManager = Map.empty
+
 processAggregate :: [Rule] -> BuffersManager -> (MetricPath, DataPoint) -> (BuffersManager, Maybe (MetricPath, DataPoint))
 processAggregate rules bm (metric, dp) = do
     -- TODO: rewrite rules PRE
@@ -21,7 +24,7 @@ processAggregate rules bm (metric, dp) = do
     let matchingRules = mapMaybe (metricRule metric) rules :: [(AggregatedMetricName, Rule)]
     let buffers = getOrCreateBuffer bm <$> matchingRules :: [MetricBuffers]
     let buffers' = flip appendDataPoint dp <$> buffers
-    let bm' = updateBuffers bm buffers'
+    let bm' = updateBuffers buffers' bm
 
     -- TODO: rewrite rules POST
 
@@ -33,8 +36,8 @@ processAggregate rules bm (metric, dp) = do
         metricRule :: MetricPath -> Rule -> Maybe (AggregatedMetricName, Rule)
         metricRule rpath rule = aggregateMetric rpath rule >>= \p -> return (p, rule)
 
-updateBuffers :: BuffersManager -> [MetricBuffers] -> BuffersManager
-updateBuffers bm buffers = compose (insertBuffer <$> buffers) $ bm
+updateBuffers :: [MetricBuffers] -> BuffersManager -> BuffersManager
+updateBuffers buffers bm = compose (insertBuffer <$> buffers) $ bm
     where insertBuffer buf manager = Map.insert (path buf) buf manager
 
 compose :: [a -> a] -> a -> a
