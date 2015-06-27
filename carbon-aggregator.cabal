@@ -20,14 +20,17 @@ library
     Carbon,
     Carbon.Aggregator,
     Carbon.Aggregator.Buffer,
-    Carbon.Aggregator.Processor
+    Carbon.Aggregator.Processor,
+    Carbon.Aggregator.Server
   build-depends:
     base >=4.7 && <4.8,
     regex-pcre-builtin ==0.94.*,
     bytestring ==0.10.*,
     stringsearch ==0.3.6.6,
     containers ==0.5.*,
-    split ==0.2.2
+    stm -any,
+    split ==0.2.2,
+    network == 2.6.*
   ghc-prof-options: -auto-all -prof
   ghc-options: -Wall
   hs-source-dirs:      src/library
@@ -38,7 +41,9 @@ executable carbon-aggregator
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.7 && <4.8,
-                       carbon-aggregator -any
+                       carbon-aggregator -any,
+                       network -any,
+                       stm -any
   hs-source-dirs:      src/daemon
   default-language:    Haskell2010
 
