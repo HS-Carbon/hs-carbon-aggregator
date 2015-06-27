@@ -15,7 +15,11 @@ import Carbon
 
 decodePlainText :: ByteString -> Maybe (MetricPath, DataPoint)
 decodePlainText string = do
-    let [path, sval, stime] = split " " string
-    val <- fst <$> Fractional.readDecimal sval
-    time <- fst <$> Integral.readDecimal stime
-    return (path, DataPoint time val)
+    let bits = split " " string
+    if length bits /= 3
+        then Nothing
+        else do
+            let [path, sval, stime] = bits
+            val <- fst <$> Fractional.readDecimal sval
+            time <- fst <$> Integral.readDecimal stime
+            return (path, DataPoint time val)

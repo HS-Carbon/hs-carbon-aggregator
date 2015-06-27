@@ -18,3 +18,6 @@ spec = do
 
         it "parses correct input" $ do
             decodePlainText "metric.path 4 1000" `shouldBe` Just ("metric.path", DataPoint 1000 4)
+
+        it "ignores incorrect input" $ do
+            decodePlainText "garbage" `shouldBe` Nothing
