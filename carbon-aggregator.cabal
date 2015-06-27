@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Carbon,
+    Carbon.Decoder,
     Carbon.Aggregator,
     Carbon.Aggregator.Buffer,
     Carbon.Aggregator.Processor,
@@ -26,6 +27,7 @@ library
     base >=4.7 && <4.8,
     regex-pcre-builtin ==0.94.*,
     bytestring ==0.10.*,
+    bytestring-lexing == 0.5.*,
     stringsearch ==0.3.6.6,
     containers ==0.5.*,
     stm -any,
@@ -65,6 +67,7 @@ test-suite tests
     carbon-aggregator -any,
     regex-pcre-builtin -any,
     bytestring -any,
+    bytestring-lexing -any,
     stringsearch -any,
     split -any,
     containers -any,
