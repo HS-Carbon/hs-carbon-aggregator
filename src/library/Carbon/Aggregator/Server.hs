@@ -6,12 +6,15 @@ where
 
 import Network.Socket hiding (socket)
 import qualified Network.Socket as NS
+import qualified Data.ByteString as B
 import Control.Monad
 import Control.Exception
 import Control.Concurrent
 import System.IO
 import Control.Concurrent.STM
-import Carbon.Aggregator.Buffer
+import Carbon
+import Carbon.Decoder
+import Carbon.Aggregator
 import Carbon.Aggregator.Processor
 
 type ServerHandler = Handle -> IO ()
@@ -29,21 +32,28 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
             forkFinally (handler h) (\_ -> do print "Client gone..."; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handleConnection :: TVar BuffersManager -> ServerHandler
-handleConnection tbm h = do
+handleConnection :: [Rule] -> TChan (MetricPath, DataPoint) -> TVar BuffersManager -> ServerHandler
+handleConnection rules outchan tbm h = do
     print "Wow! such connection!"
     hSetBuffering h LineBuffering
     loop
     where
         loop :: IO ()
         loop = do
-            line <- hGetLine h
-            print $ "Got the " ++ line
+            line <- B.hGetLine h
+            print $ "Got the " ++ show line
             -- TODO: log connection? increment counter?
+            let mm = decodePlainText line
+            case mm of
+                Just metric -> atomically $ do
+                    bm <- readTVar tbm
+                    let (bm', mmetric') = processAggregate rules bm metric
+                    case mmetric' of
+                        Just metric' -> writeTChan outchan metric'
+                        Nothing -> return ()
+                    writeTVar tbm bm'
+                Nothing -> return ()
 
-            let metrics = [] :: [MetricBuffers]
-            atomically $ do
-                modifyTVar tbm $ updateBuffers metrics
             loop
 
 
