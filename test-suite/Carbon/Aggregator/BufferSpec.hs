@@ -3,6 +3,7 @@
 
 module Carbon.Aggregator.BufferSpec (spec) where
 
+import Carbon.TestExtensions ()
 import Carbon.Aggregator
 import Carbon.Aggregator.Buffer
 
@@ -12,8 +13,6 @@ deriving instance Show MetricBuffers
 deriving instance Eq MetricBuffers
 deriving instance Show ModificationResult
 deriving instance Eq ModificationResult
-deriving instance Show DataPoint
-deriving instance Eq DataPoint
 
 spec :: Spec
 spec = do
