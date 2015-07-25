@@ -32,9 +32,9 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
             forkFinally (handler h) (\_ -> do print "Client gone..."; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handleConnection :: [Rule] -> TChan (MetricPath, DataPoint) -> TVar BuffersManager -> ServerHandler
+handleConnection :: [Rule] -> TChan [(MetricPath, DataPoint)] -> TVar BuffersManager -> ServerHandler
 handleConnection rules outchan tbm h = do
-    print "Wow! such connection!"
+    print $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
     where
@@ -46,12 +46,10 @@ handleConnection rules outchan tbm h = do
             let mm = decodePlainText line
             case mm of
                 Just metric -> atomically $ do
-                    bm <- readTVar tbm
-                    let (bm', mmetric') = processAggregate rules bm metric
+                    mmetric' <- processAggregateT rules tbm metric
                     case mmetric' of
-                        Just metric' -> writeTChan outchan metric'
+                        Just metric' -> writeTChan outchan [metric']
                         Nothing -> return ()
-                    writeTVar tbm bm'
                 Nothing -> return ()
 
             loop

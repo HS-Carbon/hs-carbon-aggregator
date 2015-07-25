@@ -3,9 +3,10 @@
 
 module Carbon.Aggregator.BufferSpec (spec) where
 
-import Carbon.TestExtensions ()
+import Carbon
 import Carbon.Aggregator
 import Carbon.Aggregator.Buffer
+import Carbon.TestExtensions ()
 
 import Test.Hspec
 

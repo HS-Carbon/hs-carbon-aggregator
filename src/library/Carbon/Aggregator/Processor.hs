@@ -1,11 +1,16 @@
-module Carbon.Aggregator.Processor
-
-where
+module Carbon.Aggregator.Processor (
+                                     BuffersManager
+                                   , newBuffersManager
+                                   , processAggregateT
+                                   , collectAggregatedT
+                                   , collectAggregated
+                                   ) where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
-import Control.Applicative
+import Data.Maybe (mapMaybe)
+import Control.Applicative ((<$>))
+import Control.Concurrent.STM (STM, TVar, readTVar, writeTVar, retry)
 
 import Carbon
 import Carbon.Aggregator hiding (aggregationMethod, aggregationFrequency)
@@ -16,6 +21,13 @@ type BuffersManager = Map MetricPath MetricBuffers
 
 newBuffersManager :: BuffersManager
 newBuffersManager = Map.empty
+
+processAggregateT :: [Rule] -> TVar BuffersManager -> (MetricPath, DataPoint) -> STM (Maybe (MetricPath, DataPoint))
+processAggregateT rules tbm (mpath, dp) = do
+    bm <- readTVar tbm
+    let (bm', maybeDp) = processAggregate rules bm (mpath, dp)
+    writeTVar tbm bm'
+    return maybeDp
 
 processAggregate :: [Rule] -> BuffersManager -> (MetricPath, DataPoint) -> (BuffersManager, Maybe (MetricPath, DataPoint))
 processAggregate rules bm (metric, dp) = do
@@ -48,3 +60,27 @@ getOrCreateBuffer bm (metric, rule) = Map.findWithDefault (createBuffer) metric 
     where createBuffer = bufferFor metric ruleFrequency ruleMethod
           ruleFrequency = Carbon.Aggregator.aggregationFrequency rule
           ruleMethod = Carbon.Aggregator.aggregationMethod rule
+
+collectAggregatedT :: Int -> Timestamp -> TVar BuffersManager -> STM [(MetricPath, DataPoint)]
+collectAggregatedT maxBuckets now tbm = do
+    bm <- readTVar tbm
+    let (metrics, bm') = collectAggregated maxBuckets now bm
+    if null metrics
+        then retry
+        else do
+            writeTVar tbm bm'
+            return metrics
+
+-- | 'collectAggregated' collects aggregated metrics that are ready to be emitted.
+-- 'maxBuckets' is program-wide configuration that  specifies how many buckets per
+-- aggregated metric name should be kept.
+collectAggregated :: Int -> Timestamp -> BuffersManager -> ([(MetricPath, DataPoint)], BuffersManager)
+collectAggregated maxBuckets now bm = do
+    Map.mapAccumWithKey accum [] bm
+    where
+        accum :: [(MetricPath, DataPoint)] -> MetricPath -> MetricBuffers -> ([(MetricPath, DataPoint)], MetricBuffers)
+        accum dps mpath mbufs = case computeAggregated maxBuckets now mbufs of
+            Nothing -> (dps, mbufs)
+            Just result -> (dps ++ emittedMetrics result, metricBuffers result)
+            where
+                emittedMetrics result = [(mpath, p) | p <- emittedDataPoints result]

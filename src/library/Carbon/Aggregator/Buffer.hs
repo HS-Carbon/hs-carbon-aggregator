@@ -1,8 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Carbon.Aggregator.Buffer (
-                                  DataPoint(..)
-                                , MetricBuffers(..)
+                                  MetricBuffers(..)
                                 , bufferFor
                                 , ModificationResult(..)
                                 , appendDataPoint

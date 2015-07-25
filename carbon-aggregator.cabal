@@ -31,6 +31,7 @@ library
     stringsearch ==0.3.6.6,
     containers ==0.5.*,
     stm -any,
+    parallel ==3.2.*,
     split ==0.2.2,
     network == 2.6.*
   ghc-prof-options: -auto-all -prof
@@ -45,7 +46,9 @@ executable carbon-aggregator
   build-depends:       base >=4.7 && <4.8,
                        carbon-aggregator -any,
                        network -any,
-                       stm -any
+                       bytestring -any,
+                       stm -any,
+                       parallel -any
   hs-source-dirs:      src/daemon
   default-language:    Haskell2010
 
@@ -71,6 +74,8 @@ test-suite tests
     stringsearch -any,
     split -any,
     containers -any,
+    stm -any,
+    parallel -any,
     hspec ==2.*,
     HUnit -any,
     QuickCheck -any
