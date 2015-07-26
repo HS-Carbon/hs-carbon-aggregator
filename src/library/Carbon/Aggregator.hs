@@ -22,6 +22,7 @@ import Data.ByteString.Char8 (readInt)
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Search (split, replace)
 import Control.Applicative
+import Control.Parallel.Strategies (NFData)
 import Carbon
 
 type InputPattern = ByteString
@@ -30,6 +31,7 @@ data AggregationMethod = Sum | Avg | Min | Max | Count deriving (Show, Eq)
 type AggregationFrequency = Int
 
 data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequency deriving (Show)
+instance NFData Rule
 
 aggregationMethod :: Rule -> AggregationMethod
 aggregationMethod (Rule _ _ method _) = method

@@ -1,25 +1,40 @@
 module Main (main) where
 
-import Carbon.Aggregator
 import Carbon.Aggregator.Server
 import Carbon.Aggregator.Processor
+import Carbon.Aggregator.Config
+import Carbon.Aggregator.Config.Loader
+import Carbon.Aggregator.Rules.Loader
+import System.FilePath (combine)
 import Network.Socket
-import Control.Monad
-import Control.Concurrent
+import Control.Monad (forever, unless)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
-import Data.Maybe
-import Control.Parallel.Strategies
+import Control.Parallel.Strategies (using, parListChunk, rdeepseq)
 
-import Data.ByteString.Char8
+import qualified Data.ByteString.Char8 as BS8
 
 main :: IO ()
 main = do
+    let confPath = combine "/opt/graphite/conf"
+    econf <- parseAggregatorConfig $ confPath "carbon.conf"
+    case econf of
+        Left errorMsg -> do
+            putStrLn errorMsg
+            putStrLn "You can find more about configuration files here: http://graphite.readthedocs.org/en/latest/config-carbon.html"
+        Right conf -> do
+            proceedWithConfig confPath conf
+
+proceedWithConfig :: (FilePath -> FilePath) -> CarbonAggregatorConfig -> IO ()
+proceedWithConfig confPath conf = do
     -- Program-wide TVar to handle metric buffers state
     tbm <- newTVarIO newBuffersManager
     -- Channel with metrics to be sent to downstream
     outchan <- newTChanIO
 
-    let maxIntervals = 5
+    let port = configLineReceiverPort conf
+
+    let maxIntervals = configMaxAggregationIntervals conf
     let parallelismLevel = 4
 
     forkIO . forever $ do
@@ -36,7 +51,12 @@ main = do
         -- Sleep 1 second
         threadDelay 1000000
 
-    let rule = fromJust . parseRuleDefinition $ pack "metric-sum (10) = sum metric"
-    runTCPServer (handleConnection [rule] outchan tbm) (iNADDR_ANY, 8082)
+    (rules, malformedRules) <- loadRules $ confPath (configAggregationRulesPath conf)
+    putStrLn $ "Aggregation rules loaded. Total rules count = " ++ show (length rules)
+    unless (null malformedRules) $ do
+        putStrLn "Some definitions contain errors and could not be parsed:"
+        mapM_ BS8.putStrLn malformedRules
 
-    return ()
+    -- TODO: there should be TCP server for each 'aggregator:x' section in config.
+    putStrLn $ "Server is running on port " ++ show port
+    runTCPServer (handleConnection rules outchan tbm) (iNADDR_ANY, port)

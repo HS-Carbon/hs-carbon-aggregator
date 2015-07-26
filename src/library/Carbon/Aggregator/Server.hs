@@ -23,25 +23,25 @@ type ServerHandler = Handle -> IO ()
 runTCPServer :: ServerHandler -> (HostAddress, Int) -> IO ()
 runTCPServer handler (host, port) = withSocketsDo $ bracket
     (bindPort host port)
-    (\s -> do print "Wow-wow, shutting server down!"; sClose s)
+    (\s -> do putStrLn "Wow-wow, shutting server down!"; sClose s)
     (forever . serve)
     where
         serve ssock = do
             (sock, _) <- acceptSafe ssock
             h <- socketToHandle sock ReadMode
-            forkFinally (handler h) (\_ -> do print "Client gone..."; hClose h)
+            forkFinally (handler h) (\_ -> do putStrLn "Client gone..."; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
 handleConnection :: [Rule] -> TChan [(MetricPath, DataPoint)] -> TVar BuffersManager -> ServerHandler
 handleConnection rules outchan tbm h = do
-    print $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
+    putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
     where
         loop :: IO ()
         loop = do
             line <- B.hGetLine h
-            print $ "Got the " ++ show line
+            putStrLn $ "Got the " ++ show line
             -- TODO: log connection? increment counter?
             let mm = decodePlainText line
             case mm of
