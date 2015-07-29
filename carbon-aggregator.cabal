@@ -32,7 +32,7 @@ library
     deepseq -any,
     regex-pcre-builtin ==0.94.*,
     bytestring ==0.10.*,
-    bytestring-lexing == 0.5.*,
+    bytestring-lexing ==0.4.*,
     stringsearch ==0.3.6.6,
     containers ==0.5.*,
     ConfigFile ==1.1.4,

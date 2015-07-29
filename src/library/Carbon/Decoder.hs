@@ -7,7 +7,7 @@ module Carbon.Decoder (
 where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lex.Fractional as Fractional
+import qualified Data.ByteString.Lex.Double as Double
 import qualified Data.ByteString.Lex.Integral as Integral
 import Data.ByteString.Search (split)
 import Control.Applicative
@@ -20,6 +20,6 @@ decodePlainText string = do
         then Nothing
         else do
             let [path, sval, stime] = bits
-            val <- fst <$> Fractional.readDecimal sval
+            val <- fst <$> Double.readDouble sval
             time <- fst <$> Integral.readDecimal stime
             return (path, DataPoint time val)
