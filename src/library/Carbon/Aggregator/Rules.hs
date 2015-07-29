@@ -5,6 +5,7 @@ module Carbon.Aggregator.Rules (
                                , ruleAggregationMethod
                                , ruleAggregationFrequency
                                , parseRuleDefinition
+                               , makeAggregatedMetricName
                                , aggregateMetric
                                ) where
 
@@ -27,6 +28,14 @@ ruleAggregationMethod (Rule _ _ method _) = method
 ruleAggregationFrequency :: Rule -> AggregationFrequency
 ruleAggregationFrequency (Rule _ _ _ freq) = freq
 
+makeAggregatedMetricName :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
+makeAggregatedMetricName (Rule _inp _outp _ _) _sm = do
+    -- TODO: create matcher from inp
+    -- Match against sm
+    -- Apply template outp
+    Nothing
+
+{-- | deprecated, use makeAggregatedMetricName instead. --}
 aggregateMetric :: SourceMetricName -> Rule -> Maybe AggregatedMetricName
 aggregateMetric sm (Rule inp outp _ _) = do
     let regex = buildRegex inp outp
