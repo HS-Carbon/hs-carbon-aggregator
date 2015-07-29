@@ -4,7 +4,8 @@
 module Carbon.Aggregator.ProcessorSpec (spec) where
 
 import Carbon
-import Carbon.Aggregator (Rule(..), AggregationMethod(..))
+import Carbon.Aggregator (AggregationMethod(..))
+import Carbon.Aggregator.Rules (Rule(..))
 import Carbon.Aggregator.Buffer (MetricBuffers(..))
 import Carbon.Aggregator.Processor
 import Carbon.TestExtensions()

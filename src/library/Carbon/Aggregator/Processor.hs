@@ -13,8 +13,8 @@ import Control.Applicative ((<$>))
 import Control.Concurrent.STM (STM, TVar, readTVar, writeTVar, retry)
 
 import Carbon
-import Carbon.Aggregator hiding (aggregationMethod, aggregationFrequency)
-import qualified Carbon.Aggregator
+import Carbon.Aggregator
+import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Buffer
 
 type BuffersManager = Map MetricPath MetricBuffers
@@ -58,8 +58,8 @@ compose fs v = foldl (flip (.)) id fs $ v
 getOrCreateBuffer :: BuffersManager -> (MetricPath, Rule) -> MetricBuffers
 getOrCreateBuffer bm (metric, rule) = Map.findWithDefault (createBuffer) metric bm
     where createBuffer = bufferFor metric ruleFrequency ruleMethod
-          ruleFrequency = Carbon.Aggregator.aggregationFrequency rule
-          ruleMethod = Carbon.Aggregator.aggregationMethod rule
+          ruleFrequency = ruleAggregationFrequency rule
+          ruleMethod = ruleAggregationMethod rule
 
 collectAggregatedT :: Int -> Timestamp -> TVar BuffersManager -> STM [(MetricPath, DataPoint)]
 collectAggregatedT maxBuckets now tbm = do

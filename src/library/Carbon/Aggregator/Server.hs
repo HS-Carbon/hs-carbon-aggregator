@@ -14,7 +14,7 @@ import System.IO
 import Control.Concurrent.STM
 import Carbon
 import Carbon.Decoder
-import Carbon.Aggregator
+import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Processor
 
 type ServerHandler = Handle -> IO ()

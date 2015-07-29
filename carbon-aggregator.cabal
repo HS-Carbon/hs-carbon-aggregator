@@ -22,6 +22,7 @@ library
     Carbon.Aggregator,
     Carbon.Aggregator.Config,
     Carbon.Aggregator.Config.Loader,
+    Carbon.Aggregator.Rules,
     Carbon.Aggregator.Rules.Loader,
     Carbon.Aggregator.Buffer,
     Carbon.Aggregator.Processor,
