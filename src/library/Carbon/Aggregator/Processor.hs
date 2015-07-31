@@ -16,6 +16,7 @@ import Carbon
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Buffer
+import Carbon.Compose
 
 type BuffersManager = Map MetricPath MetricBuffers
 
@@ -46,14 +47,11 @@ processAggregate rules bm (metric, dp) = do
 
     where
         metricRule :: MetricPath -> Rule -> Maybe (AggregatedMetricName, Rule)
-        metricRule rpath rule = aggregateMetric rpath rule >>= \p -> return (p, rule)
+        metricRule rpath rule = ruleAggregatedMetricName rule rpath >>= \p -> return (p, rule)
 
 updateBuffers :: [MetricBuffers] -> BuffersManager -> BuffersManager
 updateBuffers buffers bm = compose (insertBuffer <$> buffers) $ bm
     where insertBuffer buf manager = Map.insert (path buf) buf manager
-
-compose :: [a -> a] -> a -> a
-compose fs v = foldl (flip (.)) id fs $ v
 
 getOrCreateBuffer :: BuffersManager -> (MetricPath, Rule) -> MetricBuffers
 getOrCreateBuffer bm (metric, rule) = Map.findWithDefault (createBuffer) metric bm

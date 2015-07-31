@@ -5,19 +5,17 @@ module Carbon.Aggregator.Rules (
                                , ruleAggregationMethod
                                , ruleAggregationFrequency
                                , parseRuleDefinition
-                               , makeAggregatedMetricName
-                               , aggregateMetric
+                               , ruleAggregatedMetricName
                                ) where
 
 import Text.Regex.PCRE
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.ByteString.Char8 (readInt)
-import Data.ByteString.Lazy (toStrict)
-import Data.ByteString.Search (split, replace)
 import Control.Applicative
 import Control.Parallel.Strategies (NFData)
 import Carbon.Aggregator
+import Carbon.Aggregator.Rules.Template
 
 data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequency deriving (Show)
 instance NFData Rule
@@ -28,28 +26,8 @@ ruleAggregationMethod (Rule _ _ method _) = method
 ruleAggregationFrequency :: Rule -> AggregationFrequency
 ruleAggregationFrequency (Rule _ _ _ freq) = freq
 
-makeAggregatedMetricName :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
-makeAggregatedMetricName (Rule _inp _outp _ _) _sm = do
-    -- TODO: create matcher from inp
-    -- Match against sm
-    -- Apply template outp
-    Nothing
-
-{-- | deprecated, use makeAggregatedMetricName instead. --}
-aggregateMetric :: SourceMetricName -> Rule -> Maybe AggregatedMetricName
-aggregateMetric sm (Rule inp outp _ _) = do
-    let regex = buildRegex inp outp
-    if sm =~ regex
-        then Just outp
-        else Nothing
-
-buildRegex :: InputPattern -> OutputPattern -> ByteString
-buildRegex inp _ = B.concat ["^", (B.intercalate "\\." regex_pattern_parts), "$"]
-    where regex_pattern_parts = translate_part <$> split "." inp
-          translate_part part = strictReplace "*" "[^.]*" part
-
-strictReplace :: ByteString -> ByteString -> ByteString -> ByteString
-strictReplace old new str = toStrict $ replace old new str
+ruleAggregatedMetricName :: Rule -> SourceMetricName -> Maybe AggregatedMetricName
+ruleAggregatedMetricName (Rule inp outp _ _) sm = makeAggregatedMetricName inp outp sm
 
 parseRuleDefinition :: ByteString -> Maybe Rule
 parseRuleDefinition rulestr = do

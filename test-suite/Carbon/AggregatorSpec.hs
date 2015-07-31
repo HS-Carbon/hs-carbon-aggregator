@@ -21,6 +21,7 @@ spec = do
             let rule99 = Rule "hosts.*.hist.p99" "aggregated.hist.p99" method frequency
             let rule999 = Rule "hosts.*.hist.p999" "aggregated.hist.p999" method frequency
 
+            let aggregateMetric = flip ruleAggregatedMetricName
             it "should calculate rule99 correctly" $ do
                 aggregateMetric "hosts.abc.hist.p99" rule99 `shouldBe` Just "aggregated.hist.p99"
                 aggregateMetric "hosts.abc.hist.p99" rule999 `shouldBe` Nothing

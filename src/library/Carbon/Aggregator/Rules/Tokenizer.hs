@@ -1,6 +1,7 @@
 module Carbon.Aggregator.Rules.Tokenizer (
                                            Token(..)
                                          , parseTokenize
+                                         , parseOnlyTokenize
                                          ) where
 
 import Data.Attoparsec.ByteString.Char8
@@ -28,3 +29,6 @@ parseTokenize = do
                 nonCommand '.' = False
                 nonCommand '<' = False
                 nonCommand  _  = True
+
+parseOnlyTokenize :: ByteString -> Either String [Token]
+parseOnlyTokenize = parseOnly parseTokenize

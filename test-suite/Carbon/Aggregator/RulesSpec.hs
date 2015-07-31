@@ -20,4 +20,4 @@ spec = do
             let rule = Rule "<dc>.<app>.<component>.*.*.<metric>-max"
                             "<dc>.<app>-aggregated.<component>.<metric>-max" Max 10
             let om = "nj01.app-aggregated.component.metric-max"
-            makeAggregatedMetricName rule sm `shouldBe` Just om
+            ruleAggregatedMetricName rule sm `shouldBe` Just om

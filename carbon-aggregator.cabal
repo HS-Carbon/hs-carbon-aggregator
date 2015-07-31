@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Carbon,
+    Carbon.Compose,
     Carbon.Decoder,
     Carbon.Aggregator,
     Carbon.Aggregator.Config,
@@ -27,6 +28,9 @@ library
     Carbon.Aggregator.Buffer,
     Carbon.Aggregator.Processor,
     Carbon.Aggregator.Server
+  other-modules:
+    Carbon.Aggregator.Rules.Tokenizer,
+    Carbon.Aggregator.Rules.Template
   build-depends:
     base >=4.7 && <4.8,
     filepath -any,
