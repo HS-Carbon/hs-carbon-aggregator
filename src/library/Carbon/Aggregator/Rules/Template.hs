@@ -9,9 +9,9 @@ import Carbon.Aggregator.Rules.Tokenizer
 import Carbon.Compose
 
 import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as B
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Search (replace)
-import qualified Data.ByteString.Char8 as B
 import Text.Regex.PCRE
 
 {-- | We fallback to regular expressions here

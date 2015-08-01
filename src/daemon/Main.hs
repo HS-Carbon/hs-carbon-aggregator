@@ -12,7 +12,7 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 import Control.Parallel.Strategies (using, parListChunk, rdeepseq)
 
-import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Char8 as B
 
 main :: IO ()
 main = do
@@ -55,7 +55,7 @@ proceedWithConfig confPath conf = do
     putStrLn $ "Aggregation rules loaded. Total rules count = " ++ show (length rules)
     unless (null malformedRules) $ do
         putStrLn "Some definitions contain errors and could not be parsed:"
-        mapM_ BS8.putStrLn malformedRules
+        mapM_ B.putStrLn malformedRules
 
     -- TODO: there should be TCP server for each 'aggregator:x' section in config.
     putStrLn $ "Server is running on port " ++ show port

@@ -7,9 +7,7 @@ import Carbon.Decoder
 import Carbon
 
 import Test.Hspec
-
-deriving instance Eq DataPoint
-deriving instance Show DataPoint
+import Carbon.TestExtensions ()
 
 spec :: Spec
 spec = do

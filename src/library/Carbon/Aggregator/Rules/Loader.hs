@@ -9,24 +9,23 @@ import Carbon.Aggregator.Rules.Definition (parseRuleDefinition)
 
 import Data.Either (partitionEithers)
 import Data.Tuple (swap)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Char8 as B
 import Control.DeepSeq (force)
 
-type MalformedDefinition = BS.ByteString
+type MalformedDefinition = B.ByteString
 
 loadRules :: FilePath -> IO ([Rule], [MalformedDefinition])
 loadRules path = do
-    content <- BS.readFile path
-    let contentLines = BS8.lines content
+    content <- B.readFile path
+    let contentLines = B.lines content
     let meaningfulLines = filter meaningful contentLines
     let result = partitionEithers $ map readRule meaningfulLines
     return . force $ swap result
     where
-        meaningful :: BS.ByteString -> Bool
-        meaningful line = not ("#" `BS.isPrefixOf` line || BS.null line)
+        meaningful :: B.ByteString -> Bool
+        meaningful line = not ("#" `B.isPrefixOf` line || B.null line)
 
-        readRule :: BS.ByteString -> Either BS.ByteString Rule
+        readRule :: B.ByteString -> Either B.ByteString Rule
         readRule line = case parseRuleDefinition line of
             Nothing -> Left line
             Just rule -> Right rule

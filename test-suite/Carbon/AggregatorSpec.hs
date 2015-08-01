@@ -8,8 +8,7 @@ import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Rules.Definition
 
 import Test.Hspec
-
-deriving instance Eq Rule
+import Carbon.TestExtensions ()
 
 spec :: Spec
 spec = do
