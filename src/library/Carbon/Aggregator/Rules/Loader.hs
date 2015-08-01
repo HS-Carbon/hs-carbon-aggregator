@@ -4,7 +4,8 @@ module Carbon.Aggregator.Rules.Loader (
                                         loadRules
                                       ) where
 
-import Carbon.Aggregator.Rules (Rule, parseRuleDefinition)
+import Carbon.Aggregator.Rules (Rule)
+import Carbon.Aggregator.Rules.Definition (parseRuleDefinition)
 
 import Data.Either (partitionEithers)
 import Data.Tuple (swap)

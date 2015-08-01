@@ -5,6 +5,7 @@ module Carbon.AggregatorSpec (spec) where
 
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules
+import Carbon.Aggregator.Rules.Definition
 
 import Test.Hspec
 
