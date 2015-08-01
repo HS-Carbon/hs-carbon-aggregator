@@ -4,24 +4,33 @@ module Carbon.Aggregator.Rules.Definition (
                                             parseRuleDefinition
                                           ) where
 
-import Text.Regex.PCRE
+import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import Data.ByteString.Char8 (readInt)
 import Control.Applicative
 
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules
 
-parseRuleDefinition :: ByteString -> Maybe Rule
-parseRuleDefinition rulestr = do
-    let pattern = B.intercalate "\\s+" ["(.+?)", "\\((\\d+)\\)", "=", "(.+?)", "(.+)"]
-    matches <- rulestr =~~ pattern
-    -- first element is the source string, so drop it
-    let [outp, sfreq, smethod, inp] = tail $ head matches
-    freq <- fst <$> readInt sfreq
-    method <- readMethod smethod
+ruleDefinitionParser :: Parser Rule
+ruleDefinitionParser = do
+    skipSpace
+    outp <- takeWhile1 (not .  isSpace)
+    skipSpace
+    freq <- char '(' *> decimal <* char ')'
+    skipSpace
+    char '='
+    skipSpace
+    method <- takeWhile1 (not . isSpace) >>= readMethod
+    skipSpace
+    inp <- takeWhile1 (not .  isSpace)
     return $ Rule inp outp method freq
+
+parseRuleDefinition :: ByteString -> Maybe Rule
+parseRuleDefinition = eitherToMaybe . parseOnly ruleDefinitionParser
+
+eitherToMaybe :: Either e a -> Maybe a
+eitherToMaybe (Left _) = Nothing
+eitherToMaybe (Right a) = Just a
 
 readMethod :: Monad m => ByteString -> m AggregationMethod
 readMethod "sum"   = return Sum
