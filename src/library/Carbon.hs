@@ -3,6 +3,8 @@ module Carbon (
               , Timestamp
               , MetricValue
               , DataPoint(..)
+              , MetricTuple(..)
+              , metricTuple
               ) where
 
 import Data.ByteString (ByteString)
@@ -12,5 +14,12 @@ type MetricPath = ByteString
 
 type Timestamp = Int
 type MetricValue = Double
-data DataPoint = DataPoint { timestamp :: Timestamp, value :: MetricValue }
+
+data DataPoint = DataPoint Timestamp MetricValue
 instance NFData DataPoint
+
+data MetricTuple = MetricTuple MetricPath DataPoint
+instance NFData MetricTuple
+
+metricTuple :: MetricPath -> Timestamp -> MetricValue -> MetricTuple
+metricTuple path timestamp value = MetricTuple path (DataPoint timestamp value)

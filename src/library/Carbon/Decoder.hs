@@ -13,7 +13,7 @@ import Data.ByteString.Search (split)
 import Control.Applicative
 import Carbon
 
-decodePlainText :: ByteString -> Maybe (MetricPath, DataPoint)
+decodePlainText :: ByteString -> Maybe MetricTuple
 decodePlainText string = do
     let bits = split " " string
     if length bits /= 3
@@ -22,4 +22,4 @@ decodePlainText string = do
             let [path, sval, stime] = bits
             val <- fst <$> Double.readDouble sval
             time <- fst <$> Integral.readDecimal stime
-            return (path, DataPoint time val)
+            return $ metricTuple path time val

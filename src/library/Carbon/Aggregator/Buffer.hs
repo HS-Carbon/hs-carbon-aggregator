@@ -34,7 +34,7 @@ appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency aggregationM
     where newBuf = appendBufferDataPoint frequency dp intervalBuffers
 
 appendBufferDataPoint :: AggregationFrequency -> DataPoint -> IntervalBuffers -> IntervalBuffers
-appendBufferDataPoint freq DataPoint{..} bufs = Map.insertWith appendBuffer interval (True, [value]) bufs
+appendBufferDataPoint freq (DataPoint timestamp value) bufs = Map.insertWith appendBuffer interval (True, [value]) bufs
     where interval = timestamp `quot` freq
           appendBuffer (_, newVals) (_, oldVals) = (True, oldVals ++ newVals)
 

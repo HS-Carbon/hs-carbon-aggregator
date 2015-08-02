@@ -23,15 +23,15 @@ type BuffersManager = Map MetricPath MetricBuffers
 newBuffersManager :: BuffersManager
 newBuffersManager = Map.empty
 
-processAggregateT :: [Rule] -> TVar BuffersManager -> (MetricPath, DataPoint) -> STM (Maybe (MetricPath, DataPoint))
-processAggregateT rules tbm (mpath, dp) = do
+processAggregateT :: [Rule] -> TVar BuffersManager -> MetricTuple -> STM (Maybe MetricTuple)
+processAggregateT rules tbm mtuple = do
     bm <- readTVar tbm
-    let (bm', maybeDp) = processAggregate rules bm (mpath, dp)
+    let (bm', maybeTuple) = processAggregate rules bm mtuple
     writeTVar tbm bm'
-    return maybeDp
+    return maybeTuple
 
-processAggregate :: [Rule] -> BuffersManager -> (MetricPath, DataPoint) -> (BuffersManager, Maybe (MetricPath, DataPoint))
-processAggregate rules bm (metric, dp) = do
+processAggregate :: [Rule] -> BuffersManager -> MetricTuple -> (BuffersManager, Maybe MetricTuple)
+processAggregate rules bm mtuple@(MetricTuple metric dp) = do
     -- TODO: rewrite rules PRE
 
     let matchingRules = mapMaybe (metricRule metric) rules :: [(AggregatedMetricName, Rule)]
@@ -43,7 +43,7 @@ processAggregate rules bm (metric, dp) = do
 
     if metric `elem` (fst <$> matchingRules)
         then (bm', Nothing)
-        else (bm', Just (metric, dp))
+        else (bm', Just mtuple)
 
     where
         metricRule :: MetricPath -> Rule -> Maybe (AggregatedMetricName, Rule)
@@ -59,7 +59,7 @@ getOrCreateBuffer bm (metric, rule) = Map.findWithDefault (createBuffer) metric 
           ruleFrequency = ruleAggregationFrequency rule
           ruleMethod = ruleAggregationMethod rule
 
-collectAggregatedT :: Int -> Timestamp -> TVar BuffersManager -> STM [(MetricPath, DataPoint)]
+collectAggregatedT :: Int -> Timestamp -> TVar BuffersManager -> STM [MetricTuple]
 collectAggregatedT maxBuckets now tbm = do
     bm <- readTVar tbm
     let (metrics, bm') = collectAggregated maxBuckets now bm
@@ -72,13 +72,13 @@ collectAggregatedT maxBuckets now tbm = do
 -- | 'collectAggregated' collects aggregated metrics that are ready to be emitted.
 -- 'maxBuckets' is program-wide configuration that  specifies how many buckets per
 -- aggregated metric name should be kept.
-collectAggregated :: Int -> Timestamp -> BuffersManager -> ([(MetricPath, DataPoint)], BuffersManager)
+collectAggregated :: Int -> Timestamp -> BuffersManager -> ([MetricTuple], BuffersManager)
 collectAggregated maxBuckets now bm = do
     Map.mapAccumWithKey accum [] bm
     where
-        accum :: [(MetricPath, DataPoint)] -> MetricPath -> MetricBuffers -> ([(MetricPath, DataPoint)], MetricBuffers)
+        accum :: [MetricTuple] -> MetricPath -> MetricBuffers -> ([MetricTuple], MetricBuffers)
         accum dps mpath mbufs = case computeAggregated maxBuckets now mbufs of
             Nothing -> (dps, mbufs)
             Just result -> (dps ++ emittedMetrics result, metricBuffers result)
             where
-                emittedMetrics result = [(mpath, p) | p <- emittedDataPoints result]
+                emittedMetrics result = [MetricTuple mpath p | p <- emittedDataPoints result]

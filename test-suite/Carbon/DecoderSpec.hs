@@ -15,11 +15,11 @@ spec = do
     describe "decodePlainText" $ do
 
         it "parses correct input" $ do
-            decodePlainText "metric.path 4 1000" `shouldBe` Just ("metric.path", DataPoint 1000 4)
+            decodePlainText "metric.path 4 1000" `shouldBe` Just (metricTuple "metric.path" 1000 4)
 
         it "ignores incorrect input" $ do
             decodePlainText "garbage" `shouldBe` Nothing
 
         it "ignores incorrect numbers" $ do
             -- It isn't necessary, but why not?
-            decodePlainText "metric 4a 1000b" `shouldBe` Just ("metric", DataPoint 1000 4)
+            decodePlainText "metric 4a 1000b" `shouldBe` Just (metricTuple "metric" 1000 4)

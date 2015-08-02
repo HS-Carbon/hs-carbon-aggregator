@@ -31,7 +31,7 @@ spec = do
             let rules = [Rule "metric" "metric-sum" Sum 10]
             tbm <- newTVarIO newBuffersManager
             metrics <- atomically $ do
-                _ <- processAggregateT rules tbm ("metric", DataPoint 1001 42.0)
-                _ <- processAggregateT rules tbm ("metric", DataPoint 1002 24.0)
+                _ <- processAggregateT rules tbm $ metricTuple "metric" 1001 42.0
+                _ <- processAggregateT rules tbm $ metricTuple "metric" 1002 24.0
                 collectAggregatedT 5 1000 tbm
-            metrics `shouldBe` [("metric-sum", DataPoint 1000 66.0)]
+            metrics `shouldBe` [metricTuple "metric-sum" 1000 66.0]
