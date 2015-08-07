@@ -7,7 +7,7 @@
 -- opcodes to construct a (Haskell representation of a) Python object.
 module Language.Python.Pickle where
 
-import Control.Applicative ((<$>), (<*), (*>))
+import Control.Applicative (Applicative(..), (<$>), (<*), (*>))
 import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.ByteString as S
@@ -541,7 +541,7 @@ addToDict l (Dict d) = Dict $ foldl' add d l
 ----------------------------------------------------------------------
 
 newtype Pickler a = Pickler { runP :: WriterT [OpCode] (State (Map Value Int)) a }
-  deriving (Monad, MonadWriter [OpCode], MonadState (Map Value Int))
+  deriving (Functor, Applicative, Monad, MonadWriter [OpCode], MonadState (Map Value Int))
 
 runPickler :: Pickler () -> [OpCode]
 runPickler p = evalState (execWriterT (runP p)) M.empty
