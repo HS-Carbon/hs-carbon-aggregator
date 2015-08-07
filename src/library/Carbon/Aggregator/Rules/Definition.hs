@@ -6,6 +6,7 @@ module Carbon.Aggregator.Rules.Definition (
 
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
+import Data.Either.Convenient
 import Control.Applicative
 
 import Carbon.Aggregator
@@ -27,10 +28,6 @@ ruleDefinitionParser = do
 
 parseRuleDefinition :: ByteString -> Maybe Rule
 parseRuleDefinition = eitherToMaybe . parseOnly ruleDefinitionParser
-
-eitherToMaybe :: Either e a -> Maybe a
-eitherToMaybe (Left _) = Nothing
-eitherToMaybe (Right a) = Just a
 
 readMethod :: Monad m => ByteString -> m AggregationMethod
 readMethod "sum"   = return Sum

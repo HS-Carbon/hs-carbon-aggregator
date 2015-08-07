@@ -16,6 +16,9 @@ import Carbon
 import Carbon.Decoder
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Processor
+import Data.Maybe
+
+import Carbon.Codec.Pickle
 
 type ServerHandler = Handle -> IO ()
 
@@ -29,11 +32,11 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
         serve ssock = do
             (sock, _) <- acceptSafe ssock
             h <- socketToHandle sock ReadMode
-            forkFinally (handler h) (\_ -> do putStrLn "Client gone..."; hClose h)
+            forkFinally (handler h) (\e -> do putStrLn "Client gone..."; print e; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handleConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
-handleConnection rules outchan tbm h = do
+handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
+handlePlainTextConnection rules outchan tbm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
@@ -52,8 +55,27 @@ handleConnection rules outchan tbm h = do
                         Nothing -> return ()
                 Nothing -> return ()
 
-            loop
+            hEof <- hIsEOF h
+            unless hEof loop
 
+handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
+handlePickleConnection rules outchan tbm h = do
+    putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
+    hSetBuffering h NoBuffering
+    loop
+    where
+        loop :: IO ()
+        loop = do
+            mmtuples <- readPickled h
+            case mmtuples of
+                Nothing -> putStrLn "Could not parse message"
+                Just mtuples -> do
+                    -- Break into smaller (independent but sequentional) transactions
+                    outm <- atomically $ mapM (processAggregateT rules tbm) mtuples
+                    atomically $ writeTChan outchan (catMaybes outm)
+
+            hEof <- hIsEOF h
+            unless hEof loop
 
 createSocket :: HostAddress -> Int -> IO Socket
 createSocket host port = do

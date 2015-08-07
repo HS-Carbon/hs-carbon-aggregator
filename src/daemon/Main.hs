@@ -59,4 +59,4 @@ proceedWithConfig confPath conf = do
 
     -- TODO: there should be TCP server for each 'aggregator:x' section in config.
     putStrLn $ "Server is running on port " ++ show port
-    runTCPServer (handleConnection rules outchan tbm) (iNADDR_ANY, port)
+    runTCPServer (handlePickleConnection rules outchan tbm) (iNADDR_ANY, port)
