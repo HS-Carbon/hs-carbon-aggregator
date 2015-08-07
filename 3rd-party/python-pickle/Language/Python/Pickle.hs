@@ -199,6 +199,7 @@ decimalInt :: Parser Int
 decimalInt = signed decimal <* string "\n"
 
 -- TODO document the differences with Python's representation.
+doubleFloat :: Parser Double
 doubleFloat = double <* string "\n"
 
 decimalLong :: Parser Int
@@ -215,9 +216,11 @@ decodeLong1 = do
     else return 0
   where toLong = S.mapAccumL (\(a, b) w -> ((a + 256 ^ b * fromIntegral w, b + 1), w)) (0, 0)
 
+decodeLong4 :: Parser Int
 decodeLong4 = undefined -- TODO
 
 -- TODO escaping not implemented.
+stringnl :: Parser S.ByteString
 stringnl = choice
   [ string "'" *> takeTill (== 39) <* string "'\n"
   ]
