@@ -214,7 +214,9 @@ decodeLong1 = do
       let a = fst . fst $ toLong ns
       return $ if S.last ns > 127 then negate $ 256 ^ S.length ns - a else a
     else return 0
-  where toLong = S.mapAccumL (\(a, b) w -> ((a + 256 ^ b * fromIntegral w, b + 1), w)) (0, 0)
+  where
+    toLong :: S.ByteString -> ((Int, Int), S.ByteString)
+    toLong = S.mapAccumL (\(a, b) w -> ((a + 256 ^ b * fromIntegral w, b + 1), w)) (0, 0)
 
 decodeLong4 :: Parser Int
 decodeLong4 = undefined -- TODO
