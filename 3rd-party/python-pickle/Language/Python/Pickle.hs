@@ -514,31 +514,39 @@ executeLookup k stack memo = case IM.lookup k memo of
 executeTuple :: Monad m => [Value] -> Stack -> Memo -> m ([Value], Memo)
 executeTuple l (MarkObject:stack) memo = return (Tuple l:stack, memo)
 executeTuple l (a:stack) memo = executeTuple (a : l) stack memo
+executeTuple _ [] _ = fail "Empty Stack"
 
 executeDict :: Monad m => [(Value, Value)] -> Stack -> Memo -> m ([Value], Memo)
-executeDict l (MarkObject:stack) memo = return (l `addToDict` Dict M.empty:stack, memo)
+executeDict l (MarkObject:stack) memo = return (Dict (l `addToDict` M.empty) : stack, memo)
 executeDict l (a:b:stack) memo = executeDict ((b, a) : l) stack memo
+executeDict _ [_] _ = fail "Incorrect Stack value"
+executeDict _ [] _ = fail "Empty Stack"
 
 executeList :: Monad m => [Value] -> Stack -> Memo -> m ([Value], Memo)
 executeList l (MarkObject:stack) memo = return (List l:stack, memo)
 executeList l (x:stack) memo = executeList (x : l) stack memo
+executeList _ [] _ = fail "Empty Stack"
 
 executeSetitem :: Monad m => Stack -> Memo -> m ([Value], Memo)
 executeSetitem (v:k:Dict d:stack) memo = return (Dict (M.insert k v d):stack, memo)
+executeSetitem _ _ = fail "executeSetitem: incorrect arguments"
 
 executeSetitems :: Monad m => [(Value, Value)] -> Stack -> Memo -> m ([Value], Memo)
-executeSetitems l (MarkObject:Dict d:stack) memo = return (l `addToDict` Dict d:stack, memo)
+executeSetitems l (MarkObject:Dict d:stack) memo = return (Dict (l `addToDict` d) : stack, memo)
 executeSetitems l (a:b:stack) memo = executeSetitems ((b, a) : l) stack memo
+executeSetitems _ _ _ = fail "executeSetitems: incorrect arguments"
 
 executeAppend :: Monad m => Stack -> Memo -> m ([Value], Memo)
 executeAppend (x:List xs:stack) memo = return (List (xs ++ [x]):stack, memo)
+executeAppend _ _ = fail "executeAppend: incorrect arguments"
 
 executeAppends :: Monad m => [Value] -> Stack -> Memo -> m ([Value], Memo)
 executeAppends l (MarkObject:List xs:stack) memo = return (List (xs ++ l):stack, memo)
 executeAppends l (x:stack) memo = executeAppends (x : l) stack memo
+executeAppends _ [] _ = fail "Empty Stack"
 
-addToDict :: [(Value, Value)] -> Value -> Value
-addToDict l (Dict d) = Dict $ foldl' add d l
+addToDict :: [(Value, Value)] -> Map Value Value -> Map Value Value
+addToDict l d = foldl' add d l
   where add d' (k, v) = M.insert k v d'
 
 ----------------------------------------------------------------------
@@ -664,3 +672,4 @@ dictGetString :: Value -> S.ByteString -> Either String S.ByteString
 dictGetString (Dict d) s = case M.lookup (BinString s) d of
   Just (BinString s') -> return s'
   _ -> Left "dictGetString: not a dict, or no such key."
+dictGetString _ _ = Left "dictGetString: not a dict"
