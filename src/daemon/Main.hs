@@ -9,7 +9,7 @@ import Carbon.Aggregator.Config.Loader
 import Carbon.Aggregator.Rules.Loader
 import System.FilePath (combine)
 import Network.Socket
-import Control.Monad (forever, unless)
+import Control.Monad (forever, unless, forM_)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 
@@ -31,17 +31,19 @@ proceedWithConfig confPath conf = do
     -- Program-wide TVar to handle metric buffers state
     tbm <- newTVarIO newBuffersManager
     -- Channel with metrics to be sent to downstream
-    outchan <- newTChanIO
+    outchan <- newBroadcastTChanIO
 
     let port = configLineReceiverPort conf
 
     let maxIntervals = configMaxAggregationIntervals conf
+    let destinations = configDestinations conf
     let parallelismLevel = 4
 
-    forkIO $ do
-        let sinkHost = "127.0.0.1"
-        let sinkPort = 2004
-        runSink parallelismLevel sinkHost sinkPort outchan writePickled
+    forM_ destinations $ \destination -> do
+        let sinkHost = destinationHost destination
+        let sinkPort = destinationPort destination
+        outchan' <- atomically $ dupTChan outchan
+        forkIO $ runSink parallelismLevel sinkHost sinkPort outchan' writePickled
 
     forkIO . forever $ do
         let now = 1001

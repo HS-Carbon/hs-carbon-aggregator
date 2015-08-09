@@ -1,9 +1,17 @@
 module Carbon.Aggregator.Config (
                                   CarbonDestination(..)
+                                , destinationHost
+                                , destinationPort
                                 , CarbonAggregatorConfig(..)
                                 ) where
 
-data CarbonDestination = CarbonDestination String Int (Maybe String)
+data CarbonDestination = CarbonDestination (Maybe String) String Int
+
+destinationHost :: CarbonDestination -> String
+destinationHost (CarbonDestination _ host _) = host
+
+destinationPort :: CarbonDestination -> Int
+destinationPort (CarbonDestination _ _ port) = port
 
 data CarbonAggregatorConfig = CarbonAggregatorConfig {
     configLineReceiverInterface :: String,

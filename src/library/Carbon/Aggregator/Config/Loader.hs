@@ -4,8 +4,13 @@ module Carbon.Aggregator.Config.Loader (
 
 import Data.ConfigFile (ConfigParser(..), CPError, CPErrorData(..), emptyCP)
 import qualified Data.ConfigFile as CF
-import Control.Monad.Error (runErrorT, liftIO, join)
+import Control.Monad (join, when)
+import Control.Monad.Error (runErrorT, liftIO, throwError)
+import Control.Applicative ((<$>))
 import System.FilePath (takeFileName)
+import Data.Maybe (isNothing, fromJust)
+import Data.List.Split (splitOn)
+import Text.Read (readMaybe)
 
 import Carbon.Aggregator.Config
 
@@ -26,20 +31,22 @@ parseAggregatorConfig path = do
                                     CF.get cp "aggregator" "REWRITE_RULES"
         maxDataPointsPerMsg <- CF.get cp "aggregator" "MAX_DATAPOINTS_PER_MESSAGE"
         maxAggregationIntervals <- CF.get cp "aggregator" "MAX_AGGREGATION_INTERVALS"
+        destinationsString <- CF.get cp "aggregator" "DESTINATIONS"
+        let destinations = parseDestinations destinationsString
+        when (isNothing destinations) $ throwError (ParseError "Couldn't parse DESTINATIONS", "")
 
-        return CarbonAggregatorConfig {
+        return $! CarbonAggregatorConfig {
             configLineReceiverInterface = lineReceiverInterface,
             configLineReceiverPort = lineReceiverPort,
             configAggregationRulesPath = aggregationRulesPath,
             configRewriteRulesPath = rewriteRulesPath,
-            -- TODO: parse destinations
-            configDestinations = [],
+            configDestinations = fromJust destinations,
             configMaxDataPointsPerMsg = maxDataPointsPerMsg,
             configMaxAggregationIntervals = maxAggregationIntervals
         }
 
     case econf of
-        Left e -> return $ Left $ explainCPError e
+        Left e -> return $ Left (explainCPError e)
         Right conf -> return $ Right conf
 
     where
@@ -52,3 +59,21 @@ parseAggregatorConfig path = do
 fromEither :: a -> Either e a -> a
 fromEither _ (Right a) = a
 fromEither a (Left _) = a
+
+parseDestinations :: String -> Maybe [CarbonDestination]
+parseDestinations destinationsStr = do
+    let destinations = map strip $ splitOn "," destinationsStr
+    mapM parseDestination destinations
+    where
+        -- Very inefficient, but since we need it only once, wouldn't bother.
+        strip = lstrip . rstrip
+        lstrip = dropWhile (`elem` " \t")
+        rstrip = reverse . lstrip . reverse
+
+parseDestination :: String -> Maybe CarbonDestination
+parseDestination destinationStr = makeDestination bits
+    where
+        bits = splitOn ":" destinationStr
+        makeDestination [host, port] = CarbonDestination Nothing host <$> readMaybe port
+        makeDestination [host, port, instanceId] = CarbonDestination (Just instanceId) host <$> readMaybe port
+        makeDestination _ = Nothing
