@@ -29,7 +29,8 @@ library
     Carbon.Aggregator.Rules.Loader,
     Carbon.Aggregator.Buffer,
     Carbon.Aggregator.Processor,
-    Carbon.Aggregator.Server
+    Carbon.Aggregator.Server,
+    Carbon.Aggregator.Sink
   other-modules:
     Carbon.Codec.Pickle.Decode,
     Carbon.Codec.Pickle.Encode,

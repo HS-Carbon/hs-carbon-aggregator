@@ -1,6 +1,8 @@
 module Main (main) where
 
 import Carbon.Aggregator.Server
+import Carbon.Aggregator.Sink
+import Carbon.Codec.Pickle
 import Carbon.Aggregator.Processor
 import Carbon.Aggregator.Config
 import Carbon.Aggregator.Config.Loader
@@ -10,7 +12,6 @@ import Network.Socket
 import Control.Monad (forever, unless)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
-import Control.Parallel.Strategies (using, parListChunk, rdeepseq)
 
 import qualified Data.ByteString.Char8 as B
 
@@ -37,12 +38,10 @@ proceedWithConfig confPath conf = do
     let maxIntervals = configMaxAggregationIntervals conf
     let parallelismLevel = 4
 
-    forkIO . forever $ do
-        metrics <- atomically $ readTChan outchan
-        -- Metrics are whnf'd. We evaluate them in parallel to gain performance.
-        let metrics' = metrics `using` parListChunk parallelismLevel rdeepseq
-        -- TODO: serialize metrics and send to downstream
-        return ()
+    forkIO $ do
+        let sinkHost = "127.0.0.1"
+        let sinkPort = 2004
+        runSink parallelismLevel sinkHost sinkPort outchan writePickled
 
     forkIO . forever $ do
         let now = 1001
