@@ -16,7 +16,8 @@ import System.IO (Handle)
 writePickled :: [MetricTuple] -> Handle -> IO ()
 writePickled mtuples handle = do
     let pickled = L.toStrict $ encodePickle mtuples
-    let e = encode $ B.length pickled
+    let w32length = fromIntegral $ B.length pickled :: Word32
+    let e = encode $ w32length
     L.hPut handle e
     B.hPut handle pickled
 
