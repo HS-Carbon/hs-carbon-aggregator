@@ -159,10 +159,10 @@ popmark = string "1" *> return POP_MARK
 get', binget, long_binget, put', binput, long_binput :: Parser OpCode
 get' = string "g" *> (GET <$> decimalInt)
 binget = string "h" *> (BINGET . fromIntegral <$> anyWord8)
-long_binget = string "j" *> (LONG_BINGET <$> undefined)
+long_binget = string "j" *> (LONG_BINGET <$> int4)
 put' = string "p" *> (PUT <$> decimalInt)
 binput = string "q" *> (BINPUT . fromIntegral <$> anyWord8)
-long_binput = string "r" *> (LONG_BINPUT <$> undefined)
+long_binput = string "r" *> (LONG_BINPUT <$> int4)
 
 -- Extension registry (predefined objects)
 
@@ -264,6 +264,8 @@ serialize :: OpCode -> Put
 serialize opcode = case opcode of
   BINGET i -> putByteString "h" >> putWord8 (fromIntegral i)
   BINPUT i -> putByteString "q" >> putWord8 (fromIntegral i)
+  LONG_BINGET i -> putByteString "j" >> putWord32le (fromIntegral i)
+  LONG_BINPUT i -> putByteString "r" >> putWord32le (fromIntegral i)
   BININT i -> putByteString "J" >> putWord32le (fromIntegral i)
   BININT1 i -> putByteString "K" >> putWord8 (fromIntegral i)
   BININT2 i -> putByteString "M" >> putUint2 i
@@ -478,6 +480,8 @@ executeOne (PUT i) (s:stack) memo = return (s:stack, IM.insert i s memo)
 executeOne (GET i) stack memo = executeLookup i stack memo
 executeOne (BINPUT i) (s:stack) memo = return (s:stack, IM.insert i s memo)
 executeOne (BINGET i) stack memo = executeLookup i stack memo
+executeOne (LONG_BINPUT i) (s:stack) memo = return (s:stack, IM.insert i s memo)
+executeOne (LONG_BINGET i) stack memo = executeLookup i stack memo
 executeOne NONE stack memo = return (None:stack, memo)
 executeOne NEWTRUE stack memo = return (Bool True:stack, memo)
 executeOne NEWFALSE stack memo = return (Bool False:stack, memo)
