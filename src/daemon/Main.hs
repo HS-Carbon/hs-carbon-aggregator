@@ -38,13 +38,12 @@ proceedWithConfig confPath conf = do
 
     let maxIntervals = configMaxAggregationIntervals conf
     let destinations = configDestinations conf
-    let parallelismLevel = 4
 
     forM_ destinations $ \destination -> do
         let sinkHost = destinationHost destination
         let sinkPort = destinationPort destination
         outchan' <- atomically $ dupTChan outchan
-        forkIO $ runSink parallelismLevel sinkHost sinkPort outchan' writePickled
+        forkIO $ runSink sinkHost sinkPort outchan' writePickled
 
     forkIO . forever $ do
         now <- round `fmap` getPOSIXTime

@@ -1,23 +1,20 @@
 module Carbon.Aggregator.Sink (
                                 runSink
-                              , ParallelismLevel
                               , Host
                               , Port
                               ) where
 
 import Control.Monad
 import Control.Concurrent.STM
-import Control.Parallel.Strategies (using, parListChunk, rdeepseq)
 import Network.Socket
 import System.IO
 import Carbon
 
-type ParallelismLevel = Int
 type Host = String
 type Port = Int
 
-runSink :: ParallelismLevel -> Host -> Port -> TChan [MetricTuple] -> ([MetricTuple] -> Handle -> IO ()) -> IO ()
-runSink parallelismLevel host port outchan sinkHandler = do
+runSink :: Host -> Port -> TChan [MetricTuple] -> ([MetricTuple] -> Handle -> IO ()) -> IO ()
+runSink host port outchan sinkHandler = do
     addrInfo <- getAddrInfo Nothing (Just host) (Just $ show port)
     let serverAddr = head addrInfo
     sock <- socket (addrFamily serverAddr) Stream defaultProtocol
@@ -31,8 +28,6 @@ runSink parallelismLevel host port outchan sinkHandler = do
 
     forever $ do
         metrics <- atomically $ readTChan outchan
-        -- Metrics are whnf'd. We evaluate them in parallel to gain performance.
-        let metrics' = metrics `using` parListChunk parallelismLevel rdeepseq
         -- What happens if connection breaks during metrics send? Well, we'll loose theese metrics.
-        sinkHandler metrics' h
+        sinkHandler metrics h
         hFlush h
