@@ -12,6 +12,7 @@ import Network.Socket
 import Control.Monad (forever, unless, forM_)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
+import Data.Time.Clock.POSIX
 
 import qualified Data.ByteString.Char8 as B
 
@@ -46,8 +47,9 @@ proceedWithConfig confPath conf = do
         forkIO $ runSink parallelismLevel sinkHost sinkPort outchan' writePickled
 
     forkIO . forever $ do
-        let now = 1001
-        metrics <- atomically $ collectAggregatedT maxIntervals now tbm
+        now <- round `fmap` getPOSIXTime
+        bm <- readTVarIO tbm
+        metrics <- collectAggregatedIO maxIntervals now bm
         atomically $ writeTChan outchan metrics
         -- Sleep 1 second
         threadDelay 1000000

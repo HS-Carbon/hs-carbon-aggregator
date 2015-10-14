@@ -16,7 +16,6 @@ import Carbon
 import Carbon.Decoder
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Processor
-import Data.Maybe
 
 import Carbon.Codec.Pickle
 
@@ -35,7 +34,7 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
             forkFinally (handler h) (\e -> do putStrLn "Client gone..."; print e; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
+handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> TVar (BuffersManager TVar) -> ServerHandler
 handlePlainTextConnection rules outchan tbm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
@@ -48,17 +47,18 @@ handlePlainTextConnection rules outchan tbm h = do
             -- TODO: log connection? increment counter?
             let mm = decodePlainText line
             case mm of
-                Just metric -> atomically $ do
-                    mmetric' <- processAggregateT rules tbm metric
+                Just metric -> do
+                    let (actions, mmetric') = processAggregate rules tbm metric
+                    mapM_ atomically actions
                     case mmetric' of
-                        Just metric' -> writeTChan outchan [metric']
+                        Just metric' -> atomically $ writeTChan outchan [metric']
                         Nothing -> return ()
                 Nothing -> return ()
 
             hEof <- hIsEOF h
             unless hEof loop
 
-handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
+handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> TVar (BuffersManager TVar) -> ServerHandler
 handlePickleConnection rules outchan tbm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h NoBuffering
@@ -70,9 +70,8 @@ handlePickleConnection rules outchan tbm h = do
             case mmtuples of
                 Nothing -> putStrLn "Could not parse message"
                 Just mtuples -> do
-                    -- Break into smaller (independent but sequentional) transactions
-                    outm <- atomically $ mapM (processAggregateT rules tbm) mtuples
-                    atomically $ writeTChan outchan (catMaybes outm)
+                    outm <- processAggregateManyIO rules tbm mtuples
+                    atomically $ writeTChan outchan outm
 
             hEof <- hIsEOF h
             unless hEof loop

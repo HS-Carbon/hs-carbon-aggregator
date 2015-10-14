@@ -1,84 +1,101 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Carbon.Aggregator.Processor (
                                      BuffersManager
+                                   , BufferManagerMonad(..)
                                    , newBuffersManager
-                                   , processAggregateT
-                                   , collectAggregatedT
+                                   , processAggregate
+                                   , processAggregateManyIO
                                    , collectAggregated
+                                   , collectAggregatedIO
                                    ) where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import Control.Applicative ((<$>))
-import Control.Concurrent.STM (STM, TVar, readTVar, writeTVar, retry)
+import Control.Concurrent.STM (STM, TVar, atomically, newTVar, readTVar, writeTVar, modifyTVar)
 
 import Carbon
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Buffer
-import Carbon.Compose
 
-type BuffersManager = Map MetricPath MetricBuffers
+type BuffersManager v = Map MetricPath (v MetricBuffers)
 
-newBuffersManager :: BuffersManager
+newBuffersManager :: BuffersManager v
 newBuffersManager = Map.empty
 
-processAggregateT :: [Rule] -> TVar BuffersManager -> MetricTuple -> STM (Maybe MetricTuple)
-processAggregateT rules tbm mtuple = do
-    bm <- readTVar tbm
-    let (bm', maybeTuple) = processAggregate rules bm mtuple
-    writeTVar tbm bm'
-    return maybeTuple
+processAggregateManyIO :: [Rule] -> TVar (BuffersManager TVar) -> [MetricTuple] -> IO [MetricTuple]
+processAggregateManyIO rules tbm mtuples = do
+    let (actionss, moutms) = unzip $ map (processAggregate rules tbm) mtuples
+    mapM_ atomically $ concat actionss
+    return $ catMaybes moutms
 
-processAggregate :: [Rule] -> BuffersManager -> MetricTuple -> (BuffersManager, Maybe MetricTuple)
-processAggregate rules bm mtuple@(MetricTuple metric dp) = do
+processAggregate :: (BufferManagerMonad m v) => [Rule] -> v (BuffersManager v) -> MetricTuple -> ([m ()], (Maybe MetricTuple))
+processAggregate rules vbm mtuple@(MetricTuple metric dp) = do
     -- TODO: rewrite rules PRE
 
     let matchingRules = mapMaybe (metricRule metric) rules :: [(AggregatedMetricName, Rule)]
-    let buffers = getOrCreateBuffer bm <$> matchingRules :: [MetricBuffers]
-    let buffers' = flip appendDataPoint dp <$> buffers
-    let bm' = updateBuffers buffers' bm
+    let actions = map applyAggregationRule matchingRules
 
     -- TODO: rewrite rules POST
 
     if metric `elem` (fst <$> matchingRules)
-        then (bm', Nothing)
-        else (bm', Just mtuple)
+        then (actions, Nothing)
+        else (actions, Just mtuple)
 
     where
         metricRule :: MetricPath -> Rule -> Maybe (AggregatedMetricName, Rule)
         metricRule rpath rule = ruleAggregatedMetricName rule rpath >>= \p -> return (p, rule)
 
-updateBuffers :: [MetricBuffers] -> BuffersManager -> BuffersManager
-updateBuffers buffers bm = compose (insertBuffer <$> buffers) $ bm
-    where insertBuffer buf manager = Map.insert (path buf) buf manager
+        applyAggregationRule (metricName, rule) = processAggregateRule rule vbm metricName dp
 
-getOrCreateBuffer :: BuffersManager -> (MetricPath, Rule) -> MetricBuffers
-getOrCreateBuffer bm (metric, rule) = Map.findWithDefault (createBuffer) metric bm
-    where createBuffer = bufferFor metric ruleFrequency ruleMethod
-          ruleFrequency = ruleAggregationFrequency rule
-          ruleMethod = ruleAggregationMethod rule
+processAggregateRule :: (BufferManagerMonad m v) => Rule -> v (BuffersManager v) -> AggregatedMetricName -> DataPoint -> m ()
+processAggregateRule rule vmbm metric dp = do
+    vBuf <- getBufferRef vmbm (metric, rule)
+    appendBufferDataPoint vBuf dp
 
-collectAggregatedT :: Int -> Timestamp -> TVar BuffersManager -> STM [MetricTuple]
-collectAggregatedT maxBuckets now tbm = do
-    bm <- readTVar tbm
-    let (metrics, bm') = collectAggregated maxBuckets now bm
-    if null metrics
-        then retry
-        else do
-            writeTVar tbm bm'
-            return metrics
+collectAggregatedIO :: Int -> Timestamp -> BuffersManager TVar -> IO [MetricTuple]
+collectAggregatedIO maxBuckets now bm = concat <$> mapM atomically (collectAggregated maxBuckets now bm)
 
--- | 'collectAggregated' collects aggregated metrics that are ready to be emitted.
--- 'maxBuckets' is program-wide configuration that  specifies how many buckets per
--- aggregated metric name should be kept.
-collectAggregated :: Int -> Timestamp -> BuffersManager -> ([MetricTuple], BuffersManager)
+collectAggregated :: Int -> Timestamp -> BuffersManager TVar -> [STM [MetricTuple]]
 collectAggregated maxBuckets now bm = do
-    Map.mapAccumWithKey accum [] bm
+    -- We need to iterate through map _modifying_ each if its MetricBuffers
+    -- We could of course return just "STM [MetricTuple]", but chosen approach allows us to operate with smaller transactions.
+    map process $ Map.assocs bm
     where
-        accum :: [MetricTuple] -> MetricPath -> MetricBuffers -> ([MetricTuple], MetricBuffers)
-        accum dps mpath mbufs = case computeAggregated maxBuckets now mbufs of
-            Nothing -> (dps, mbufs)
-            Just result -> (dps ++ emittedMetrics result, metricBuffers result)
-            where
-                emittedMetrics result = [MetricTuple mpath p | p <- emittedDataPoints result]
+        process :: (AggregatedMetricName, TVar MetricBuffers) -> STM [MetricTuple]
+        process (mpath, vmbufs) = do
+            mbufs <- readTVar vmbufs
+            case computeAggregated maxBuckets now mbufs of
+                Nothing -> return []
+                Just result -> do
+                    writeTVar vmbufs $! metricBuffers result
+                    return [MetricTuple mpath p | p <- emittedDataPoints result]
+
+class Monad m => BufferManagerMonad m v where
+
+    getBufferRef :: v (BuffersManager v) -> (AggregatedMetricName, Rule) -> m (v MetricBuffers)
+
+    appendBufferDataPoint :: v MetricBuffers -> DataPoint -> m ()
+
+instance BufferManagerMonad STM TVar where
+
+    getBufferRef vbm (mpath, rule) = do
+        bm <- readTVar vbm
+        buf <- newTVar $ createBuffer
+        case Map.insertLookupWithKey' keepOldValue mpath buf bm of
+            (Nothing, bm') -> do
+                writeTVar vbm bm'
+                return buf
+            (Just existingBuf, _) -> do
+                return existingBuf
+
+        where createBuffer = bufferFor mpath ruleFrequency ruleMethod
+              ruleFrequency = ruleAggregationFrequency rule
+              ruleMethod = ruleAggregationMethod rule
+              keepOldValue _key _newval oldval = oldval
+
+    appendBufferDataPoint vBuf dp = modifyTVar vBuf $
+        \buf -> appendDataPoint buf dp

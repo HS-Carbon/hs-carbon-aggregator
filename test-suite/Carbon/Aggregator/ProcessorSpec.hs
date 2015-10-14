@@ -23,15 +23,16 @@ spec = do
 
         it "works with empty buffer manager" $ do
             let bm = newBuffersManager
-            let (metrics, bm') = collectAggregated 5 1000 bm
+            metrics <- collectAggregatedIO 5 1000 bm
             metrics `shouldBe` []
-            bm' `shouldBe` bm
 
         it "works with non-empty buffer manager" $ do
             let rules = [Rule "metric" "metric-sum" Sum 10]
             tbm <- newTVarIO newBuffersManager
-            metrics <- atomically $ do
-                _ <- processAggregateT rules tbm $ metricTuple "metric" 1001 42.0
-                _ <- processAggregateT rules tbm $ metricTuple "metric" 1002 24.0
-                collectAggregatedT 5 1000 tbm
+            processAggregateManyIO rules tbm [metricTuple "metric" 1001 42.0, metricTuple "metric" 1002 24.0]
+
+            metrics <- collectAggregatedIO 5 1000 =<< readTVarIO tbm
             metrics `shouldBe` [metricTuple "metric-sum" 1000 66.0]
+
+            metrics' <- collectAggregatedIO 5 1000 =<< readTVarIO tbm
+            metrics' `shouldBe` []
