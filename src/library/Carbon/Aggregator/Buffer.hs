@@ -59,6 +59,7 @@ computeAggregatedIO maxIntervals now mbufs@MetricBuffers{..} = do
             let dps = catMaybes maybeDps
             return dps
 
+-- | Update 'MetricBuffers' *in place* and return "fresh" buffers, silently dropping outdated ones
 splitBuffersT :: Int -> Timestamp -> MetricBuffers -> STM IntervalBuffers
 splitBuffersT maxIntervals now MetricBuffers{..} = do
     let currentInterval = now `quot` frequency

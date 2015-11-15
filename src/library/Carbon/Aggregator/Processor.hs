@@ -3,7 +3,6 @@
 
 module Carbon.Aggregator.Processor (
                                      BuffersManager
-                                   , BufferManagerMonad(..)
                                    , newBuffersManager
                                    , processAggregate
                                    , processAggregateManyIO
@@ -21,18 +20,18 @@ import Carbon.Aggregator
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Buffer
 
-type BuffersManager v = Map MetricPath (v MetricBuffers)
+type BuffersManager = Map MetricPath (TVar MetricBuffers)
 
-newBuffersManager :: BuffersManager v
+newBuffersManager :: BuffersManager
 newBuffersManager = Map.empty
 
-processAggregateManyIO :: [Rule] -> TVar (BuffersManager TVar) -> [MetricTuple] -> IO [MetricTuple]
+processAggregateManyIO :: [Rule] -> TVar BuffersManager -> [MetricTuple] -> IO [MetricTuple]
 processAggregateManyIO rules tbm mtuples = do
     let (actionss, moutms) = unzip $ map (processAggregate rules tbm) mtuples
     mapM_ atomically $ concat actionss
     return $ catMaybes moutms
 
-processAggregate :: (BufferManagerMonad m v) => [Rule] -> v (BuffersManager v) -> MetricTuple -> ([m ()], (Maybe MetricTuple))
+processAggregate :: [Rule] -> TVar BuffersManager -> MetricTuple -> ([STM ()], (Maybe MetricTuple))
 processAggregate rules vbm mtuple@(MetricTuple metric dp) = do
     -- TODO: rewrite rules PRE
 
@@ -51,12 +50,12 @@ processAggregate rules vbm mtuple@(MetricTuple metric dp) = do
 
         applyAggregationRule (metricName, rule) = processAggregateRule rule vbm metricName dp
 
-processAggregateRule :: (BufferManagerMonad m v) => Rule -> v (BuffersManager v) -> AggregatedMetricName -> DataPoint -> m ()
+processAggregateRule :: Rule -> TVar BuffersManager -> AggregatedMetricName -> DataPoint -> STM ()
 processAggregateRule rule vmbm metric dp = do
     buf <- getBufferRef vmbm (metric, rule)
     appendBufferDataPoint buf dp
 
-collectAggregatedIO :: Int -> Timestamp -> BuffersManager TVar -> IO [MetricTuple]
+collectAggregatedIO :: Int -> Timestamp -> BuffersManager -> IO [MetricTuple]
 collectAggregatedIO maxBuckets now bm = do
     fmap concat (mapM process $ Map.assocs bm)
     where
@@ -67,29 +66,23 @@ collectAggregatedIO maxBuckets now bm = do
             dps <- computeAggregatedIO maxBuckets now mbufs
             return [MetricTuple mpath p | p <- dps]
 
-class Monad m => BufferManagerMonad m v where
+getBufferRef :: TVar BuffersManager -> (AggregatedMetricName, Rule) -> STM (TVar MetricBuffers)
+getBufferRef vbm (mpath, rule) = do
+    bm :: Map MetricPath (TVar MetricBuffers) <- readTVar vbm
+    buf :: TVar MetricBuffers <- newTVar =<< createBuffer
+    case Map.insertLookupWithKey' keepOldValue mpath buf bm of
+        (Nothing, bm') -> do
+            writeTVar vbm bm'
+            return buf
+        (Just existingBuf, _) -> do
+            return existingBuf
 
-    getBufferRef :: v (BuffersManager v) -> (AggregatedMetricName, Rule) -> m (v MetricBuffers)
+    where createBuffer = bufferFor mpath ruleFrequency ruleMethod
+          ruleFrequency = ruleAggregationFrequency rule
+          ruleMethod = ruleAggregationMethod rule
+          keepOldValue _key _newval oldval = oldval
 
-    appendBufferDataPoint :: v MetricBuffers -> DataPoint -> m ()
-
-instance BufferManagerMonad STM TVar where
-
-    getBufferRef vbm (mpath, rule) = do
-        bm :: Map MetricPath (TVar MetricBuffers) <- readTVar vbm
-        buf :: TVar MetricBuffers <- newTVar =<< createBuffer
-        case Map.insertLookupWithKey' keepOldValue mpath buf bm of
-            (Nothing, bm') -> do
-                writeTVar vbm bm'
-                return buf
-            (Just existingBuf, _) -> do
-                return existingBuf
-
-        where createBuffer = bufferFor mpath ruleFrequency ruleMethod
-              ruleFrequency = ruleAggregationFrequency rule
-              ruleMethod = ruleAggregationMethod rule
-              keepOldValue _key _newval oldval = oldval
-
-    appendBufferDataPoint vBuf dp = do
-        buf <- readTVar vBuf
-        appendDataPoint buf dp
+appendBufferDataPoint :: TVar MetricBuffers -> DataPoint -> STM ()
+appendBufferDataPoint vBuf dp = do
+    buf <- readTVar vBuf
+    appendDataPoint buf dp
