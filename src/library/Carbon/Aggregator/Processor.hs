@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Carbon.Aggregator.Processor (
                                      BuffersManager
@@ -6,7 +7,6 @@ module Carbon.Aggregator.Processor (
                                    , newBuffersManager
                                    , processAggregate
                                    , processAggregateManyIO
-                                   , collectAggregated
                                    , collectAggregatedIO
                                    ) where
 
@@ -14,7 +14,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe, catMaybes)
 import Control.Applicative ((<$>))
-import Control.Concurrent.STM (STM, TVar, atomically, newTVar, readTVar, writeTVar, modifyTVar)
+import Control.Concurrent.STM (STM, TVar, atomically, newTVar, readTVar, readTVarIO, writeTVar)
 
 import Carbon
 import Carbon.Aggregator
@@ -53,26 +53,19 @@ processAggregate rules vbm mtuple@(MetricTuple metric dp) = do
 
 processAggregateRule :: (BufferManagerMonad m v) => Rule -> v (BuffersManager v) -> AggregatedMetricName -> DataPoint -> m ()
 processAggregateRule rule vmbm metric dp = do
-    vBuf <- getBufferRef vmbm (metric, rule)
-    appendBufferDataPoint vBuf dp
+    buf <- getBufferRef vmbm (metric, rule)
+    appendBufferDataPoint buf dp
 
 collectAggregatedIO :: Int -> Timestamp -> BuffersManager TVar -> IO [MetricTuple]
-collectAggregatedIO maxBuckets now bm = concat <$> mapM atomically (collectAggregated maxBuckets now bm)
-
-collectAggregated :: Int -> Timestamp -> BuffersManager TVar -> [STM [MetricTuple]]
-collectAggregated maxBuckets now bm = do
-    -- We need to iterate through map _modifying_ each if its MetricBuffers
-    -- We could of course return just "STM [MetricTuple]", but chosen approach allows us to operate with smaller transactions.
-    map process $ Map.assocs bm
+collectAggregatedIO maxBuckets now bm = do
+    fmap concat (mapM process $ Map.assocs bm)
     where
-        process :: (AggregatedMetricName, TVar MetricBuffers) -> STM [MetricTuple]
+        process :: (AggregatedMetricName, TVar MetricBuffers) -> IO [MetricTuple]
         process (mpath, vmbufs) = do
-            mbufs <- readTVar vmbufs
-            case computeAggregated maxBuckets now mbufs of
-                Nothing -> return []
-                Just result -> do
-                    writeTVar vmbufs $! metricBuffers result
-                    return [MetricTuple mpath p | p <- emittedDataPoints result]
+            -- TODO: get rid of TVar here
+            mbufs <- readTVarIO vmbufs
+            dps <- computeAggregatedIO maxBuckets now mbufs
+            return [MetricTuple mpath p | p <- dps]
 
 class Monad m => BufferManagerMonad m v where
 
@@ -83,8 +76,8 @@ class Monad m => BufferManagerMonad m v where
 instance BufferManagerMonad STM TVar where
 
     getBufferRef vbm (mpath, rule) = do
-        bm <- readTVar vbm
-        buf <- newTVar $ createBuffer
+        bm :: Map MetricPath (TVar MetricBuffers) <- readTVar vbm
+        buf :: TVar MetricBuffers <- newTVar =<< createBuffer
         case Map.insertLookupWithKey' keepOldValue mpath buf bm of
             (Nothing, bm') -> do
                 writeTVar vbm bm'
@@ -97,5 +90,6 @@ instance BufferManagerMonad STM TVar where
               ruleMethod = ruleAggregationMethod rule
               keepOldValue _key _newval oldval = oldval
 
-    appendBufferDataPoint vBuf dp = modifyTVar vBuf $
-        \buf -> appendDataPoint buf dp
+    appendBufferDataPoint vBuf dp = do
+        buf <- readTVar vBuf
+        appendDataPoint buf dp

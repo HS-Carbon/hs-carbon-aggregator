@@ -3,73 +3,85 @@
 module Carbon.Aggregator.Buffer (
                                   MetricBuffers(..)
                                 , bufferFor
-                                , ModificationResult(..)
                                 , appendDataPoint
-                                , computeAggregated
+                                , computeAggregatedIO
                                 ) where
 
 import Carbon
 import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (catMaybes)
+import Control.Applicative ((<$>))
+import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, writeTVar, modifyTVar')
 
 type Interval = Int
 type Buffer = (Bool, [MetricValue])
-type IntervalBuffers = Map Interval Buffer
+type IntervalBuffers = Map Interval (TVar Buffer)
 data MetricBuffers = MetricBuffers {
     path :: MetricPath,
     frequency :: AggregationFrequency,
     aggregationMethod :: AggregationMethod,
-    intervalBuffers :: IntervalBuffers,
-    hasUnprocessedData :: Bool
+    intervalBuffers :: TVar IntervalBuffers
 }
 
-data ModificationResult = ModificationResult { metricBuffers :: MetricBuffers, emittedDataPoints :: [DataPoint] }
+bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> STM MetricBuffers
+bufferFor path freq aggmethod = do
+    intervallBuffers <- newTVar Map.empty
+    return $ MetricBuffers path freq aggmethod intervallBuffers
 
-bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> MetricBuffers
-bufferFor path freq aggmethod = MetricBuffers path freq aggmethod Map.empty False
+appendDataPoint :: MetricBuffers -> DataPoint -> STM ()
+appendDataPoint MetricBuffers{..} dp = appendBufferDataPoint frequency dp intervalBuffers
 
-appendDataPoint :: MetricBuffers -> DataPoint -> MetricBuffers
-appendDataPoint MetricBuffers{..} dp = MetricBuffers path frequency aggregationMethod newBuf True
-    where newBuf = appendBufferDataPoint frequency dp intervalBuffers
-
-appendBufferDataPoint :: AggregationFrequency -> DataPoint -> IntervalBuffers -> IntervalBuffers
-appendBufferDataPoint freq (DataPoint timestamp value) bufs = Map.insertWith appendBuffer interval (True, [value]) bufs
+appendBufferDataPoint :: AggregationFrequency -> DataPoint -> TVar IntervalBuffers -> STM ()
+appendBufferDataPoint freq (DataPoint timestamp value) tbufs = do
+    -- TODO: can be improved with custom "insertOrUpdate" Map function.
+    bufs <- readTVar tbufs
+    case Map.lookup interval bufs of
+        Just (tBuf) -> do
+            modifyTVar' tBuf $ appendBufferValue value
+        Nothing -> do
+            tBuf <- newTVar (True, [value])
+            writeTVar tbufs $ Map.insert interval tBuf bufs
     where interval = timestamp `quot` freq
-          appendBuffer (_, newVals) (_, oldVals) = (True, oldVals ++ newVals)
 
--- Check if there are data point ready to be emitted. If there aren't any, Nothing is returned.
-computeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
-computeAggregated maxIntervals now mbufs
-    -- No buffers - nothing to return
-    | Map.null $ intervalBuffers mbufs = Nothing
-    | otherwise = doComputeAggregated maxIntervals now mbufs
+appendBufferValue :: MetricValue -> Buffer -> Buffer
+appendBufferValue val (_, oldVals) = (True, oldVals ++ [val])
 
-doComputeAggregated :: Int -> Timestamp -> MetricBuffers -> Maybe ModificationResult
-doComputeAggregated maxIntervals now mbufs@MetricBuffers{..} = do
+computeAggregatedIO :: Int -> Timestamp -> MetricBuffers -> IO [DataPoint]
+computeAggregatedIO maxIntervals now mbufs@MetricBuffers{..} = do
+    freshBufs <- atomically $ splitBuffersT maxIntervals now mbufs
+    if Map.null $ freshBufs
+        then
+            return []
+        else do
+            maybeDps <- mapM atomically $ computeAggregateBuffersT frequency aggregationMethod freshBufs
+            let dps = catMaybes maybeDps
+            return dps
+
+splitBuffersT :: Int -> Timestamp -> MetricBuffers -> STM IntervalBuffers
+splitBuffersT maxIntervals now MetricBuffers{..} = do
     let currentInterval = now `quot` frequency
     let thresholdInterval = currentInterval - maxIntervals
     -- Split buffers into those that passed age threshold and those that didn't.
-    let (outdatedBufs, freshBufs) = Map.split thresholdInterval intervalBuffers
+    (_outdatedBufs, freshBufs) <- Map.split thresholdInterval <$> readTVar intervalBuffers
+    writeTVar intervalBuffers $! freshBufs
+    return freshBufs
 
-    -- No outdated buffers, no unprocessed data - nothing to return.
-    if (Map.null outdatedBufs) && (not hasUnprocessedData)
-        then Nothing
-        else do
-            let dps = computeDataPoints freshBufs
-            let mbufs' = mbufs{ intervalBuffers = deactivate freshBufs, hasUnprocessedData = False }
-            return $ ModificationResult mbufs' dps
-
+computeAggregateBuffersT :: AggregationFrequency -> AggregationMethod -> IntervalBuffers -> [STM (Maybe DataPoint)]
+computeAggregateBuffersT frequency aggregationMethod bufs = map processBuffer $ Map.assocs bufs
     where
-        computeDataPoints :: IntervalBuffers -> [DataPoint]
-        computeDataPoints = Map.foldWithKey appendActiveDps []
+        processBuffer :: (Interval, TVar Buffer) -> STM (Maybe DataPoint)
+        processBuffer (interval, tbuf) = do
+            buf <- readTVar tbuf
+            case buf of
+                (False, _) -> return Nothing
+                (True, vals) -> do
+                    writeTVar tbuf (False, vals)
+                    return . Just $ bufferDp (interval * frequency) vals
 
-        appendActiveDps :: Interval -> Buffer -> [DataPoint] -> [DataPoint]
-        appendActiveDps _ (False, _) dps = dps
-        appendActiveDps interval (True, vals) dps = (bufferDp interval vals) : dps
-
-        bufferDp :: Interval -> [MetricValue] -> DataPoint
-        bufferDp interval vals = DataPoint (interval * frequency) (aggreagte vals)
+        bufferDp :: Timestamp -> [MetricValue] -> DataPoint
+        bufferDp time vals = DataPoint time (aggreagte vals)
 
         aggreagte :: [MetricValue] -> MetricValue
         aggreagte = aggregateWith aggregationMethod
@@ -78,6 +90,3 @@ doComputeAggregated maxIntervals now mbufs@MetricBuffers{..} = do
                   aggregateWith Min   vals = minimum vals
                   aggregateWith Max   vals = maximum vals
                   aggregateWith Count vals = realToFrac $ length vals
-
-        deactivate :: IntervalBuffers -> IntervalBuffers
-        deactivate = Map.map (\(_, vals) -> (False, vals))
