@@ -52,6 +52,9 @@ library
     cereal,
     mtl ==2.*,
     stm -any,
+    stm-containers -any,
+    list-t -any,
+    focus -any,
     parallel ==3.2.*,
     split ==0.2.2,
     network == 2.6.*

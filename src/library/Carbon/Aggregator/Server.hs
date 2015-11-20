@@ -34,8 +34,8 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
             forkFinally (handler h) (\e -> do putStrLn "Client gone..."; print e; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
-handlePlainTextConnection rules outchan tbm h = do
+handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
+handlePlainTextConnection rules outchan bm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
@@ -48,7 +48,7 @@ handlePlainTextConnection rules outchan tbm h = do
             let mm = decodePlainText line
             case mm of
                 Just metric -> do
-                    let (actions, mmetric') = processAggregate rules tbm metric
+                    let (actions, mmetric') = processAggregate rules bm metric
                     mapM_ atomically actions
                     case mmetric' of
                         Just metric' -> atomically $ writeTChan outchan [metric']
@@ -58,8 +58,8 @@ handlePlainTextConnection rules outchan tbm h = do
             hEof <- hIsEOF h
             unless hEof loop
 
-handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> TVar BuffersManager -> ServerHandler
-handlePickleConnection rules outchan tbm h = do
+handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
+handlePickleConnection rules outchan bm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h NoBuffering
     loop
@@ -70,7 +70,7 @@ handlePickleConnection rules outchan tbm h = do
             case mmtuples of
                 Nothing -> putStrLn "Could not parse message"
                 Just mtuples -> do
-                    outm <- processAggregateManyIO rules tbm mtuples
+                    outm <- processAggregateManyIO rules bm mtuples
                     atomically $ writeTChan outchan outm
 
             hEof <- hIsEOF h

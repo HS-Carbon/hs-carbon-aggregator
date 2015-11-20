@@ -29,8 +29,7 @@ main = do
 
 proceedWithConfig :: (FilePath -> FilePath) -> CarbonAggregatorConfig -> IO ()
 proceedWithConfig confPath conf = do
-    -- Program-wide TVar to handle metric buffers state
-    tbm <- newTVarIO newBuffersManager
+    bm <- newBuffersManagerIO
     -- Channel with metrics to be sent to downstream
     outchan <- newBroadcastTChanIO
 
@@ -47,7 +46,6 @@ proceedWithConfig confPath conf = do
 
     forkIO . forever $ do
         now <- round `fmap` getPOSIXTime
-        bm <- readTVarIO tbm
         metrics <- collectAggregatedIO maxIntervals now bm
         atomically $ writeTChan outchan metrics
         -- Sleep 1 second
@@ -61,4 +59,4 @@ proceedWithConfig confPath conf = do
 
     -- TODO: there should be TCP server for each 'aggregator:x' section in config.
     putStrLn $ "Server is running on port " ++ show port
-    runTCPServer (handlePickleConnection rules outchan tbm) (iNADDR_ANY, port)
+    runTCPServer (handlePickleConnection rules outchan bm) (iNADDR_ANY, port)
