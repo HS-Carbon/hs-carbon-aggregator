@@ -20,5 +20,7 @@ data CarbonAggregatorConfig = CarbonAggregatorConfig {
     configRewriteRulesPath :: FilePath,
     configDestinations :: [CarbonDestination],
     configMaxDataPointsPerMsg :: Int,
-    configMaxAggregationIntervals :: Int
+    configMaxAggregationIntervals :: Int,
+    configCarbonMetricPrefix :: String,
+    configCarbonMetricInterval :: Int
 }

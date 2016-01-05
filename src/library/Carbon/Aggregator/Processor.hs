@@ -22,14 +22,6 @@ import Carbon.Aggregator
 import Carbon.Aggregator.Rules
 import Carbon.Aggregator.Buffer
 
-type BuffersManager = STMap.Map MetricPath MetricBuffers
-
-newBuffersManager :: STM BuffersManager
-newBuffersManager = STMap.new
-
-newBuffersManagerIO :: IO BuffersManager
-newBuffersManagerIO = STMap.newIO
-
 processAggregateManyIO :: [Rule] -> BuffersManager -> [MetricTuple] -> IO [MetricTuple]
 processAggregateManyIO rules bm mtuples = do
     let (actionss, moutms) = unzip $ map (processAggregate rules bm) mtuples

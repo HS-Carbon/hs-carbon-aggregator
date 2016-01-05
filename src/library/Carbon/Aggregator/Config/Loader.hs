@@ -35,6 +35,14 @@ parseAggregatorConfig path = do
         let destinations = parseDestinations destinationsString
         when (isNothing destinations) $ throwError (ParseError "Couldn't parse DESTINATIONS", "")
 
+        let carbonMetricPrefix = fromEither
+                                    "carbon" $
+                                    CF.get cp "aggregator" "CARBON_METRIC_PREFIX"
+
+        let carbonMetricInterval = fromEither
+                                    60 $
+                                    CF.get cp "aggregator" "CARBON_METRIC_INTERVAL"
+
         return $! CarbonAggregatorConfig {
             configLineReceiverInterface = lineReceiverInterface,
             configLineReceiverPort = lineReceiverPort,
@@ -42,7 +50,9 @@ parseAggregatorConfig path = do
             configRewriteRulesPath = rewriteRulesPath,
             configDestinations = fromJust destinations,
             configMaxDataPointsPerMsg = maxDataPointsPerMsg,
-            configMaxAggregationIntervals = maxAggregationIntervals
+            configMaxAggregationIntervals = maxAggregationIntervals,
+            configCarbonMetricPrefix = carbonMetricPrefix,
+            configCarbonMetricInterval = carbonMetricInterval
         }
 
     case econf of

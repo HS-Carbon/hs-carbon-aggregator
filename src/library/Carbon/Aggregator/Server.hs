@@ -34,8 +34,8 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
             forkFinally (handler h) (\e -> do putStrLn "Client gone..."; print e; hClose h)
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
-handlePlainTextConnection :: [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
-handlePlainTextConnection rules outchan bm h = do
+handlePlainTextConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
+handlePlainTextConnection reportMetricsCount rules outchan bm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
@@ -48,6 +48,8 @@ handlePlainTextConnection rules outchan bm h = do
             let mm = decodePlainText line
             case mm of
                 Just metric -> do
+                    reportMetricsCount 1
+
                     let (actions, mmetric') = processAggregate rules bm metric
                     mapM_ atomically actions
                     case mmetric' of
@@ -58,8 +60,8 @@ handlePlainTextConnection rules outchan bm h = do
             hEof <- hIsEOF h
             unless hEof loop
 
-handlePickleConnection :: [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
-handlePickleConnection rules outchan bm h = do
+handlePickleConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
+handlePickleConnection reportMetricsCount rules outchan bm h = do
     putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h NoBuffering
     loop
@@ -70,6 +72,7 @@ handlePickleConnection rules outchan bm h = do
             case mmtuples of
                 Nothing -> putStrLn "Could not parse message"
                 Just mtuples -> do
+                    reportMetricsCount $ length mtuples
                     outm <- processAggregateManyIO rules bm mtuples
                     atomically $ writeTChan outchan outm
 

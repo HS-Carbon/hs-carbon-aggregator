@@ -30,7 +30,8 @@ library
     Carbon.Aggregator.Buffer,
     Carbon.Aggregator.Processor,
     Carbon.Aggregator.Server,
-    Carbon.Aggregator.Sink
+    Carbon.Aggregator.Sink,
+    Carbon.Stats
   other-modules:
     Carbon.Codec.Pickle.Decode,
     Carbon.Codec.Pickle.Encode,
@@ -71,6 +72,7 @@ executable carbon-aggregator
                        filepath -any,
                        carbon-aggregator -any,
                        network -any,
+                       hostname -any,
                        time -any,
                        bytestring -any,
                        stm -any

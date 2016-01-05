@@ -2,9 +2,14 @@
 
 module Carbon.Aggregator.Buffer (
                                   MetricBuffers(..)
+                                , BuffersManager
                                 , bufferFor
+                                , bufferManagerLength
+                                , countBufferedDataPoints
                                 , appendDataPoint
                                 , computeAggregatedIO
+                                , newBuffersManager
+                                , newBuffersManagerIO
                                 ) where
 
 import Carbon
@@ -13,7 +18,10 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Control.Applicative ((<$>))
-import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, writeTVar, modifyTVar')
+import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, readTVarIO, writeTVar, modifyTVar')
+import Control.Monad (foldM)
+import qualified STMContainers.Map as STMap
+import ListT (toList)
 
 type Interval = Int
 type Buffer = (Bool, [MetricValue])
@@ -25,10 +33,32 @@ data MetricBuffers = MetricBuffers {
     intervalBuffers :: TVar IntervalBuffers
 }
 
+type BuffersManager = STMap.Map MetricPath MetricBuffers
+
 bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> STM MetricBuffers
 bufferFor path freq aggmethod = do
     intervallBuffers <- newTVar Map.empty
     return $ MetricBuffers path freq aggmethod intervallBuffers
+
+newBuffersManager :: STM BuffersManager
+newBuffersManager = STMap.new
+
+newBuffersManagerIO :: IO BuffersManager
+newBuffersManagerIO = STMap.newIO
+
+bufferManagerLength :: BuffersManager -> STM Int
+bufferManagerLength bm = length <$> (toList $ STMap.stream bm)
+
+countBufferedDataPoints :: BuffersManager -> IO Int
+countBufferedDataPoints bm = foldM accumBufferManagerDps 0 =<< streamBuffers bm
+    where
+        streamBuffers = atomically . toList . STMap.stream
+        accumBufferManagerDps :: Int -> (MetricPath, MetricBuffers) -> IO Int
+        accumBufferManagerDps r (_, metricBuffers) = do
+            intervalBuffers' <- readTVarIO $ intervalBuffers metricBuffers
+            buffers' <- sequence $ readTVarIO <$> Map.elems intervalBuffers'
+            let bufferredDps = sum $ map (\(_, dps) -> length dps) buffers'
+            return $! r + bufferredDps
 
 appendDataPoint :: MetricBuffers -> DataPoint -> STM ()
 appendDataPoint MetricBuffers{..} dp = appendBufferDataPoint frequency dp intervalBuffers
