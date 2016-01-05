@@ -1,0 +1,24 @@
+language: haskell
+os:
+  - linux
+ghc: 7.8
+sudo: false
+
+cache:
+  directories:
+    - .cabal-sandbox
+    - ~/.cabal
+
+before_cache:
+  - rm -rf .cabal-sandbox/logs
+  - rm -f ~/.cabal/packages/hackage.haskell.org/build-reports.log
+
+before_install:
+  - |-
+    if ! grep "split-objs: True" ~/.cabal/config; then echo "split-objs: True" >> ~/.cabal/config; fi
+  - export PATH=~/.cabal/bin:$PATH
+  - cabal sandbox init
+  - cabal install happy alex
+  - cabal --version
+  - alex --version
+  - happy --version
