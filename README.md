@@ -1,10 +1,12 @@
 # hs-carbon-aggregator [![Build Status](https://travis-ci.org/ratsam/hs-carbon-aggregator.svg?branch=master)](https://travis-ci.org/ratsam/hs-carbon-aggregator)
 
-#### Like `carbon-aggregator.py` only multi-threaded.
-Designed as drop-in replacement for `carbon-aggregator.py` with fine-tuned native concurrency.
-
 <img src="https://raw.githubusercontent.com/ratsam/hs-carbon-aggregator/master/readme-resources/multicore.jpg" width="250"/>  
 `carbon-aggregator.py` at work
+
+#### Like `carbon-aggregator.py` only multi-threaded.
+Designed as drop-in replacement for `carbon-aggregator.py` with fine-tuned native concurrency.  
+Simply run executable and it will pick up your existing aggregator configuration. As simple as `./hs-carbon-aggregator`.  
+If required you can provide explicit configuration location, i.e. `./hs-carbon-aggregator --config=/opt/graphite/conf/carbon.conf`.
 
 #### Differences and limitations
 
