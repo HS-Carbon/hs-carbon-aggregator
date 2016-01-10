@@ -21,6 +21,7 @@ parseAggregatorConfig path = do
         -- It means it won't be possible to lookup for keys like "LINE_RECEIVER_INTERFACE"
         -- Pass 'id' instead to search exact given key
         cp <- join $ liftIO $ CF.readfile emptyCP{optionxform = id} path
+        let confDir = optional $ CF.get cp "aggregator" "CONF_DIR"
         lineReceiverInterface <- CF.get cp "aggregator" "LINE_RECEIVER_INTERFACE"
         lineReceiverPort <- CF.get cp "aggregator" "LINE_RECEIVER_PORT"
         let aggregationRulesPath = fromEither
@@ -44,6 +45,7 @@ parseAggregatorConfig path = do
                                     CF.get cp "aggregator" "CARBON_METRIC_INTERVAL"
 
         return $! CarbonAggregatorConfig {
+            configConfDir = confDir,
             configLineReceiverInterface = lineReceiverInterface,
             configLineReceiverPort = lineReceiverPort,
             configAggregationRulesPath = aggregationRulesPath,
@@ -69,6 +71,10 @@ parseAggregatorConfig path = do
 fromEither :: a -> Either e a -> a
 fromEither _ (Right a) = a
 fromEither a (Left _) = a
+
+optional :: Either e a -> Maybe a
+optional (Right a) = Just a
+optional _ = Nothing
 
 parseDestinations :: String -> Maybe [CarbonDestination]
 parseDestinations destinationsStr = do

@@ -1,3 +1,6 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
 import Carbon.Aggregator.Server
@@ -8,26 +11,60 @@ import Carbon.Aggregator.Config
 import Carbon.Aggregator.Config.Loader
 import Carbon.Aggregator.Rules.Loader
 import Carbon.Stats
-import System.FilePath (combine)
+import System.Environment (lookupEnv)
+import System.FilePath (combine, takeDirectory, normalise)
 import Network.Socket
 import Network.HostName
+import Control.Applicative ((<$>))
 import Control.Monad (forever, unless, forM_)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 import Data.Time.Clock.POSIX
 
 import qualified Data.ByteString.Char8 as B
+import qualified Carbon.Aggregator.Options as AggregatorOptions
 
 main :: IO ()
-main = do
-    let confPath = combine "/opt/graphite/conf"
-    econf <- parseAggregatorConfig $ confPath "carbon.conf"
+main = AggregatorOptions.withOptionsDo $ \options -> do
+    econf <- resolveConfiguration $ AggregatorOptions.configPath options
+
     case econf of
         Left errorMsg -> do
             putStrLn errorMsg
             putStrLn "You can find more about configuration files here: http://graphite.readthedocs.org/en/latest/config-carbon.html"
+        Right (confPath, conf) -> do
+            proceedWithConfig (combine confPath) conf
+
+-- Resolve order:   option (--config=carbon.conf)
+--                  conf (CONF_DIR)
+--                  env (GRAPHITE_CONF_DIR)
+--                  env (GRAPHITE_ROOT/conf)
+resolveConfiguration :: Maybe FilePath -> IO (Either String (FilePath, CarbonAggregatorConfig))
+resolveConfiguration (Just path) = do
+    let path' = takeDirectory $ normalise path
+    econf :: Either String CarbonAggregatorConfig <- parseAggregatorConfig path
+    -- Explicit path always has biggest priority.
+    return $ (,) path' <$> econf
+resolveConfiguration Nothing = do
+    resolvedPath <- lookupConfPath
+    let confFile = combine resolvedPath "carbon.conf"
+
+    parseAggregatorConfig confFile >>= \case
+        Left err -> return $ Left err
         Right conf -> do
-            proceedWithConfig confPath conf
+            case configConfDir conf of
+                -- Path specified in carbon.conf has higher priority than configured via environment variables.
+                Just configuredPath -> return $ Right (configuredPath, conf)
+                _ -> return $ Right (resolvedPath, conf)
+
+lookupConfPath :: IO FilePath
+lookupConfPath = do
+    lookupEnv "GRAPHITE_CONF_DIR" >>= \case
+        Just path -> return path
+        _ -> do
+            lookupEnv "GRAPHITE_ROOT" >>= \case
+                Just path -> return $ combine path "conf"
+                _ -> return "/opt/graphite/conf"
 
 proceedWithConfig :: (FilePath -> FilePath) -> CarbonAggregatorConfig -> IO ()
 proceedWithConfig confPath conf = do

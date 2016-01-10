@@ -14,6 +14,7 @@ destinationPort :: CarbonDestination -> Int
 destinationPort (CarbonDestination _ _ port) = port
 
 data CarbonAggregatorConfig = CarbonAggregatorConfig {
+    configConfDir :: Maybe FilePath,
     configLineReceiverInterface :: String,
     configLineReceiverPort :: Int,
     configAggregationRulesPath :: FilePath,

@@ -22,6 +22,7 @@ library
     Carbon.Decoder,
     Carbon.Codec.Pickle,
     Carbon.Aggregator,
+    Carbon.Aggregator.Options,
     Carbon.Aggregator.Config,
     Carbon.Aggregator.Config.Loader,
     Carbon.Aggregator.Rules,
@@ -41,6 +42,7 @@ library
   build-depends:
     base >=4.7 && <4.8,
     filepath -any,
+    optparse-applicative -any,
     deepseq -any,
     regex-pcre-builtin ==0.94.*,
     attoparsec ==0.12.*,
