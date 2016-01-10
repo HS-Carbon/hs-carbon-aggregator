@@ -29,3 +29,15 @@ Feature to be supported soon.
 `RELAY_RULES`  
 
 Please let me know if your setup requires any specific configuration options and I'll add them.
+
+## Building from sources
+You will need Haskell and Cabal installed, e.g. from [Haskell Platform](https://www.haskell.org/platform/).  
+Then:
+```bash
+git clone https://github.com/ratsam/hs-carbon-aggregator.git
+cd hs-carbon-aggregator
+cabal sandbox init
+cabal install --only-dependencies --enable-tests --reorder-goals -j
+cabal build
+```
+Default path for executable is `dist/build/carbon-aggregator/`.
