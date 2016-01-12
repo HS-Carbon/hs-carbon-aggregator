@@ -16,8 +16,9 @@ import System.FilePath (combine, takeDirectory, normalise)
 import Network.Socket
 import Network.HostName
 import Control.Applicative ((<$>))
-import Control.Monad (forever, unless, forM_)
+import Control.Monad (forever, unless, forM_, when)
 import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Data.Time.Clock.POSIX
 
@@ -74,8 +75,6 @@ proceedWithConfig confPath conf = do
     -- Channel with metrics to be sent to downstream
     outchan <- newBroadcastTChanIO
 
-    let port = configLineReceiverPort conf
-
     let maxIntervals = configMaxAggregationIntervals conf
     let destinations = configDestinations conf
 
@@ -116,5 +115,22 @@ proceedWithConfig confPath conf = do
     let reportMetricsCount = recordReceivedDataPoint smap
 
     -- TODO: there should be TCP server for each 'aggregator:x' section in config.
-    putStrLn $ "Server is running on port " ++ show port
-    runTCPServer (handlePickleConnection reportMetricsCount rules outchan bm) (iNADDR_ANY, port)
+    let lineReceiverPort = configLineReceiverPort conf
+    let pickleReceiverPort = configPickleReceiverPort conf
+    if (lineReceiverPort == 0 && pickleReceiverPort == 0)
+        then
+            putStrLn "You should specify at least one receiver port"
+        else do
+            let receiverSpecs = [
+                    ((handlePlainTextConnection reportMetricsCount rules outchan bm), iNADDR_ANY, lineReceiverPort),
+                    ((handlePickleConnection reportMetricsCount rules outchan bm), iNADDR_ANY, pickleReceiverPort)
+                    ]
+
+            mapConcurrently startServer receiverSpecs
+            return ()
+
+startServer :: (ServerHandler, HostAddress, Int) -> IO ()
+startServer (handler, address, port) = do
+    when (port > 0) $ do
+        putStrLn $ "Launching listener on port " ++ show port
+        runTCPServer handler (address, port)

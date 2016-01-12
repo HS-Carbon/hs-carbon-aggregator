@@ -17,6 +17,8 @@ data CarbonAggregatorConfig = CarbonAggregatorConfig {
     configConfDir :: Maybe FilePath,
     configLineReceiverInterface :: String,
     configLineReceiverPort :: Int,
+    configPickleReceiverInterface :: String,
+    configPickleReceiverPort :: Int,
     configAggregationRulesPath :: FilePath,
     configRewriteRulesPath :: FilePath,
     configDestinations :: [CarbonDestination],

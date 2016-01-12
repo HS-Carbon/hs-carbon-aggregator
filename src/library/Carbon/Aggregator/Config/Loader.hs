@@ -24,6 +24,8 @@ parseAggregatorConfig path = do
         let confDir = optional $ CF.get cp "aggregator" "CONF_DIR"
         lineReceiverInterface <- CF.get cp "aggregator" "LINE_RECEIVER_INTERFACE"
         lineReceiverPort <- CF.get cp "aggregator" "LINE_RECEIVER_PORT"
+        pickleReceiverInterface <- CF.get cp "aggregator" "PICKLE_RECEIVER_INTERFACE"
+        pickleReceiverPort <- CF.get cp "aggregator" "PICKLE_RECEIVER_PORT"
         let aggregationRulesPath = fromEither
                                     "aggregation-rules.conf" $
                                     CF.get cp "aggregator" "AGGREGATION_RULES"
@@ -48,6 +50,8 @@ parseAggregatorConfig path = do
             configConfDir = confDir,
             configLineReceiverInterface = lineReceiverInterface,
             configLineReceiverPort = lineReceiverPort,
+            configPickleReceiverInterface = pickleReceiverInterface,
+            configPickleReceiverPort = pickleReceiverPort,
             configAggregationRulesPath = aggregationRulesPath,
             configRewriteRulesPath = rewriteRulesPath,
             configDestinations = fromJust destinations,
