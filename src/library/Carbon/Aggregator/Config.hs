@@ -1,11 +1,14 @@
 module Carbon.Aggregator.Config (
-                                  CarbonDestination(..)
+                                  InstanceName
+                                , CarbonDestination(..)
                                 , destinationHost
                                 , destinationPort
                                 , CarbonAggregatorConfig(..)
                                 ) where
 
-data CarbonDestination = CarbonDestination (Maybe String) String Int
+type InstanceName = Maybe String
+
+data CarbonDestination = CarbonDestination InstanceName String Int
 
 destinationHost :: CarbonDestination -> String
 destinationHost (CarbonDestination _ host _) = host

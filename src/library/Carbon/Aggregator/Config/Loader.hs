@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Carbon.Aggregator.Config.Loader (
                                          parseAggregatorConfig
                                        ) where
@@ -5,7 +7,7 @@ module Carbon.Aggregator.Config.Loader (
 import Data.ConfigFile (ConfigParser(..), CPError, CPErrorData(..), emptyCP)
 import qualified Data.ConfigFile as CF
 import Control.Monad (join, when)
-import Control.Monad.Error (runErrorT, liftIO, throwError)
+import Control.Monad.Error (runErrorT, liftIO, throwError, MonadError)
 import Control.Applicative ((<$>))
 import System.FilePath (takeFileName)
 import Data.Maybe (isNothing, fromJust)
@@ -14,37 +16,47 @@ import Text.Read (readMaybe)
 
 import Carbon.Aggregator.Config
 
-parseAggregatorConfig :: FilePath -> IO (Either String CarbonAggregatorConfig)
-parseAggregatorConfig path = do
+getValue :: (CF.Get_C a, MonadError CF.CPError m) => CF.ConfigParser -> InstanceName -> CF.OptionSpec -> m a
+getValue cp Nothing option = CF.get cp "aggregator" option
+getValue cp (Just instanceName) option = do
+    if CF.has_option cp ("aggregator:" ++ instanceName) option
+        then
+            CF.get cp ("aggregator:" ++ instanceName) option
+        else
+            getValue cp Nothing option
+
+parseAggregatorConfig :: FilePath -> InstanceName -> IO (Either String CarbonAggregatorConfig)
+parseAggregatorConfig path maybeInstanceName = do
     econf <- runErrorT $ do
         -- ConfigFile.emptyCP uses 'toLower' as default keys transformation function.
         -- It means it won't be possible to lookup for keys like "LINE_RECEIVER_INTERFACE"
         -- Pass 'id' instead to search exact given key
         cp <- join $ liftIO $ CF.readfile emptyCP{optionxform = id} path
-        let confDir = optional $ CF.get cp "aggregator" "CONF_DIR"
-        lineReceiverInterface <- CF.get cp "aggregator" "LINE_RECEIVER_INTERFACE"
-        lineReceiverPort <- CF.get cp "aggregator" "LINE_RECEIVER_PORT"
-        pickleReceiverInterface <- CF.get cp "aggregator" "PICKLE_RECEIVER_INTERFACE"
-        pickleReceiverPort <- CF.get cp "aggregator" "PICKLE_RECEIVER_PORT"
+
+        let confDir = optional $ getValue cp maybeInstanceName "CONF_DIR"
+        lineReceiverInterface <- getValue cp maybeInstanceName "LINE_RECEIVER_INTERFACE"
+        lineReceiverPort <- getValue cp maybeInstanceName "LINE_RECEIVER_PORT"
+        pickleReceiverInterface <- getValue cp maybeInstanceName "PICKLE_RECEIVER_INTERFACE"
+        pickleReceiverPort <- getValue cp maybeInstanceName "PICKLE_RECEIVER_PORT"
         let aggregationRulesPath = fromEither
                                     "aggregation-rules.conf" $
-                                    CF.get cp "aggregator" "AGGREGATION_RULES"
+                                    getValue cp maybeInstanceName "AGGREGATION_RULES"
         let rewriteRulesPath = fromEither
                                     "rewrite-rules.conf" $
-                                    CF.get cp "aggregator" "REWRITE_RULES"
-        maxDataPointsPerMsg <- CF.get cp "aggregator" "MAX_DATAPOINTS_PER_MESSAGE"
-        maxAggregationIntervals <- CF.get cp "aggregator" "MAX_AGGREGATION_INTERVALS"
-        destinationsString <- CF.get cp "aggregator" "DESTINATIONS"
+                                    getValue cp maybeInstanceName "REWRITE_RULES"
+        maxDataPointsPerMsg <- getValue cp maybeInstanceName "MAX_DATAPOINTS_PER_MESSAGE"
+        maxAggregationIntervals <- getValue cp maybeInstanceName "MAX_AGGREGATION_INTERVALS"
+        destinationsString <- getValue cp maybeInstanceName "DESTINATIONS"
         let destinations = parseDestinations destinationsString
         when (isNothing destinations) $ throwError (ParseError "Couldn't parse DESTINATIONS", "")
 
         let carbonMetricPrefix = fromEither
                                     "carbon" $
-                                    CF.get cp "aggregator" "CARBON_METRIC_PREFIX"
+                                    getValue cp maybeInstanceName "CARBON_METRIC_PREFIX"
 
         let carbonMetricInterval = fromEither
                                     60 $
-                                    CF.get cp "aggregator" "CARBON_METRIC_INTERVAL"
+                                    getValue cp maybeInstanceName "CARBON_METRIC_INTERVAL"
 
         return $! CarbonAggregatorConfig {
             configConfDir = confDir,

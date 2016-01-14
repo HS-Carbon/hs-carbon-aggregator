@@ -10,7 +10,7 @@ import Carbon.Aggregator.Processor
 import Carbon.Aggregator.Config
 import Carbon.Aggregator.Config.Loader
 import Carbon.Aggregator.Rules.Loader
-import Carbon.Stats
+import qualified Carbon.Stats as Stats
 import System.Environment (lookupEnv)
 import System.FilePath (combine, takeDirectory, normalise)
 import Network.Socket
@@ -27,30 +27,31 @@ import qualified Carbon.Aggregator.Options as AggregatorOptions
 
 main :: IO ()
 main = AggregatorOptions.withOptionsDo $ \options -> do
-    econf <- resolveConfiguration $ AggregatorOptions.configPath options
+    let instanceName = AggregatorOptions.instanceName options
+    econf <- resolveConfiguration (AggregatorOptions.configPath options) instanceName
 
     case econf of
         Left errorMsg -> do
             putStrLn errorMsg
             putStrLn "You can find more about configuration files here: http://graphite.readthedocs.org/en/latest/config-carbon.html"
         Right (confPath, conf) -> do
-            proceedWithConfig (combine confPath) conf
+            proceedWithConfig (combine confPath) instanceName conf
 
 -- Resolve order:   option (--config=carbon.conf)
 --                  conf (CONF_DIR)
 --                  env (GRAPHITE_CONF_DIR)
 --                  env (GRAPHITE_ROOT/conf)
-resolveConfiguration :: Maybe FilePath -> IO (Either String (FilePath, CarbonAggregatorConfig))
-resolveConfiguration (Just path) = do
+resolveConfiguration :: Maybe FilePath -> InstanceName -> IO (Either String (FilePath, CarbonAggregatorConfig))
+resolveConfiguration (Just path) instanceName = do
     let path' = takeDirectory $ normalise path
-    econf :: Either String CarbonAggregatorConfig <- parseAggregatorConfig path
+    econf :: Either String CarbonAggregatorConfig <- parseAggregatorConfig path instanceName
     -- Explicit path always has biggest priority.
     return $ (,) path' <$> econf
-resolveConfiguration Nothing = do
+resolveConfiguration Nothing instanceName = do
     resolvedPath <- lookupConfPath
     let confFile = combine resolvedPath "carbon.conf"
 
-    parseAggregatorConfig confFile >>= \case
+    parseAggregatorConfig confFile instanceName >>= \case
         Left err -> return $ Left err
         Right conf -> do
             case configConfDir conf of
@@ -67,9 +68,9 @@ lookupConfPath = do
                 Just path -> return $ combine path "conf"
                 _ -> return "/opt/graphite/conf"
 
-proceedWithConfig :: (FilePath -> FilePath) -> CarbonAggregatorConfig -> IO ()
-proceedWithConfig confPath conf = do
-    smap <- newStatsMap
+proceedWithConfig :: (FilePath -> FilePath) -> InstanceName -> CarbonAggregatorConfig -> IO ()
+proceedWithConfig confPath instanceName conf = do
+    smap <- Stats.newStatsMap
 
     bm <- newBuffersManagerIO
     -- Channel with metrics to be sent to downstream
@@ -88,20 +89,19 @@ proceedWithConfig confPath conf = do
         now <- round `fmap` getPOSIXTime
         metrics <- collectAggregatedIO maxIntervals now bm
         atomically $ writeTChan outchan metrics
-        recordAggregatedDataPoint smap $ (length metrics)
+        Stats.recordAggregatedDataPoint smap $ (length metrics)
         -- Sleep 1 second
         threadDelay 1000000
 
     serverHostName <- getHostName
-    let statsConfig = StatsConfig {
-        metricPrefix = configCarbonMetricPrefix conf,
-        hostname = serverHostName,
-        -- TODO: Carbon instance names not supported yet
-        instanceName = Nothing
+    let statsConfig = Stats.StatsConfig {
+        Stats.metricPrefix = configCarbonMetricPrefix conf,
+        Stats.hostname = serverHostName,
+        Stats.instanceName = instanceName
     }
     forkIO . forever $ do
         now <- round `fmap` getPOSIXTime
-        metrics <- collectSelfStatsIO statsConfig smap bm now
+        metrics <- Stats.collectSelfStatsIO statsConfig smap bm now
         atomically $ writeTChan outchan metrics
 
         threadDelay $ 1000000 * configCarbonMetricInterval conf
@@ -112,9 +112,8 @@ proceedWithConfig confPath conf = do
         putStrLn "Some definitions contain errors and could not be parsed:"
         mapM_ B.putStrLn malformedRules
 
-    let reportMetricsCount = recordReceivedDataPoint smap
+    let reportMetricsCount = Stats.recordReceivedDataPoint smap
 
-    -- TODO: there should be TCP server for each 'aggregator:x' section in config.
     let lineReceiverPort = configLineReceiverPort conf
     let pickleReceiverPort = configPickleReceiverPort conf
     if (lineReceiverPort == 0 && pickleReceiverPort == 0)
