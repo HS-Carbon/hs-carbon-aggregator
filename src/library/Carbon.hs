@@ -15,11 +15,14 @@ type MetricPath = ByteString
 type Timestamp = Int
 type MetricValue = Double
 
-data DataPoint = DataPoint Timestamp MetricValue
+data DataPoint = DataPoint
+                    {-# UNPACK #-} !Timestamp
+                    {-# UNPACK #-} !MetricValue
 instance NFData DataPoint
 
-data MetricTuple = MetricTuple MetricPath DataPoint
+data MetricTuple = MetricTuple !MetricPath !DataPoint
 instance NFData MetricTuple
 
 metricTuple :: MetricPath -> Timestamp -> MetricValue -> MetricTuple
 metricTuple path timestamp value = MetricTuple path (DataPoint timestamp value)
+{-# INLINABLE metricTuple #-}

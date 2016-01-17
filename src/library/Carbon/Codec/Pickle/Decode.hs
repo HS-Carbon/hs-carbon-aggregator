@@ -26,7 +26,7 @@ readPickled handle = do
     -- and decode
     case decodePickle msg of
         Left err -> print err >> return Nothing
-        Right res -> return $ Just res
+        Right res -> return . Just $! res
 
 decodePickle :: ByteString -> Either String [MetricTuple]
 decodePickle pickled = do
@@ -42,11 +42,13 @@ mkMetricTuple (Tuple [BinString path, Tuple [valTimestamp, valValue]]) = do
     value <- pickleToValue valValue
     return $ metricTuple path timestamp value
 mkMetricTuple v = fail $ "Can't parse MetricTuple from " ++ show v
+{-# SPECIALIZE mkMetricTuple :: Value -> Maybe MetricTuple #-}
 
 pickleToTimestamp :: (Monad m) => Value -> m Timestamp
 pickleToTimestamp (BinLong timestamp) = return timestamp
 pickleToTimestamp (BinInt timestamp) = return timestamp
 pickleToTimestamp v = fail $ "Unable to parse timestamp from " ++ show v
+{-# SPECIALIZE pickleToTimestamp :: Value -> Maybe Timestamp #-}
 
 pickleToValue :: (Monad m) => Value -> m MetricValue
 -- By default metric value sent as string.
@@ -58,3 +60,4 @@ pickleToValue (BinFloat value) = return value
 pickleToValue (BinLong value) = return $ fromIntegral value
 pickleToValue (BinInt value) = return $ fromIntegral value
 pickleToValue v = fail $  "Unable to parse metric value from " ++ show v
+{-# SPECIALIZE pickleToValue :: Value -> Maybe MetricValue #-}

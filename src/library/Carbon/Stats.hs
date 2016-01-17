@@ -42,6 +42,7 @@ newStatsMap = do
     where
         mapFromKeysM :: (Monad m, Functor m, Ord k) => (k -> m v) -> [k] -> m (Map k v)
         mapFromKeysM f keys = Map.fromList <$> forM keys (\k -> f k >>= \v -> return (k, v))
+        {-# SPECIALIZE mapFromKeysM :: (Stat -> IO (IORef Int)) -> [Stat] -> IO (Map Stat (IORef Int)) #-}
 
 recordStat :: Stat -> StatsMap -> Int -> IO ()
 recordStat stat smap incrementBy = do
@@ -49,12 +50,15 @@ recordStat stat smap incrementBy = do
     where
         get k m = fromJust $ Map.lookup k m
         modifyIncrement add oldval = (oldval + add, ())
+{-# INLINABLE recordStat #-}
 
 recordReceivedDataPoint :: StatsMap -> Int -> IO ()
 recordReceivedDataPoint = recordStat DataPointsReceived
+{-# INLINABLE recordReceivedDataPoint #-}
 
 recordAggregatedDataPoint :: StatsMap -> Int -> IO ()
 recordAggregatedDataPoint = recordStat AggregatedDataPoints
+{-# INLINABLE recordAggregatedDataPoint #-}
 
 getAndResetStat :: StatsMap -> Stat -> IO Int
 getAndResetStat smap stat = do

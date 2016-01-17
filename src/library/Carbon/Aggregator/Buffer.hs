@@ -14,8 +14,8 @@ module Carbon.Aggregator.Buffer (
 
 import Carbon
 import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
 import Control.Applicative ((<$>))
 import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, readTVarIO, writeTVar, modifyTVar')
@@ -72,11 +72,11 @@ appendBufferDataPoint freq (DataPoint timestamp value) tbufs = do
             modifyTVar' tBuf $ appendBufferValue value
         Nothing -> do
             tBuf <- newTVar (True, [value])
-            writeTVar tbufs $ Map.insert interval tBuf bufs
+            writeTVar tbufs $! Map.insert interval tBuf bufs
     where interval = timestamp `quot` freq
 
 appendBufferValue :: MetricValue -> Buffer -> Buffer
-appendBufferValue val (_, oldVals) = (True, oldVals ++ [val])
+appendBufferValue val (_, oldVals) = (True, val : oldVals)
 
 computeAggregatedIO :: Int -> Timestamp -> MetricBuffers -> IO [DataPoint]
 computeAggregatedIO maxIntervals now mbufs@MetricBuffers{..} = do
@@ -109,7 +109,7 @@ computeAggregateBuffersT frequency aggregationMethod bufs = map processBuffer $ 
                 (False, _) -> return Nothing
                 (True, vals) -> do
                     writeTVar tbuf (False, vals)
-                    return . Just $ bufferDp (interval * frequency) vals
+                    return . Just $! bufferDp (interval * frequency) vals
 
         bufferDp :: Timestamp -> [MetricValue] -> DataPoint
         bufferDp time vals = DataPoint time (aggreagte vals)

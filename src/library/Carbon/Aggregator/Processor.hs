@@ -73,3 +73,4 @@ getBufferRef bm (mpath, rule) = do
 
         insertIfNotExistsM :: (Monad m) => a -> StrategyM m a a
         insertIfNotExistsM a = maybe (return (a, Replace a)) (\r -> return (r, Keep))
+        {-# SPECIALIZE insertIfNotExistsM :: MetricBuffers -> StrategyM STM MetricBuffers MetricBuffers #-}
