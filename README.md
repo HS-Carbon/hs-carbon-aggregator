@@ -14,10 +14,6 @@ If required you can provide explicit configuration location, i.e. `./hs-carbon-a
 
 - Please note that HS Carbon Aggregator only supports Line and Pickle interfaces. AMQP interface isn't supported yet.
 
-- Instances management isn't supported yet.
-This means that `hs-carbon-aggregator` won't recognize `[aggregator:x]` configuration sections.  
-Feature to be supported soon.
-
 - Rewrite rules aren't supported and unlikely to be supported soon.
 
 #### Some important configuration options that aren't supported yet
@@ -32,7 +28,7 @@ Feature to be supported soon.
 
 Please let me know if your setup requires any specific configuration options and I'll add them.
 
-## Building from sources
+## Building from source
 You will need Haskell and Cabal installed, e.g. from [Haskell Platform](https://www.haskell.org/platform/).  
 Then:
 ```bash
