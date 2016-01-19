@@ -34,7 +34,9 @@ Then:
 ```bash
 git clone https://github.com/HS-Carbon/hs-carbon-aggregator.git
 cd hs-carbon-aggregator
+cabal update
 cabal sandbox init
+cabal install happy alex
 cabal install --only-dependencies --enable-tests --reorder-goals -j
 cabal build
 ```
