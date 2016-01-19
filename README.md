@@ -32,7 +32,7 @@ Please let me know if your setup requires any specific configuration options and
 You will need Haskell and Cabal installed, e.g. from [Haskell Platform](https://www.haskell.org/platform/).  
 Then:
 ```bash
-git clone https://github.com/ratsam/hs-carbon-aggregator.git
+git clone https://github.com/HS-Carbon/hs-carbon-aggregator.git
 cd hs-carbon-aggregator
 cabal sandbox init
 cabal install --only-dependencies --enable-tests --reorder-goals -j
