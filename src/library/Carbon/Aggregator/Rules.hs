@@ -5,12 +5,10 @@ module Carbon.Aggregator.Rules (
                                , ruleAggregatedMetricName
                                ) where
 
-import Control.Parallel.Strategies (NFData)
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules.Template
 
 data Rule = Rule InputPattern OutputPattern AggregationMethod AggregationFrequency deriving (Show)
-instance NFData Rule
 
 ruleAggregationMethod :: Rule -> AggregationMethod
 ruleAggregationMethod (Rule _ _ method _) = method

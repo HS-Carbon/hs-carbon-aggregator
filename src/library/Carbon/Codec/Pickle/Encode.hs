@@ -8,7 +8,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Builder
 import Data.Monoid
-import Data.Foldable
 import Data.Binary
 
 import System.IO (Handle)

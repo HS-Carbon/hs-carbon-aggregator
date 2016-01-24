@@ -17,7 +17,6 @@ import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
-import Control.Applicative ((<$>))
 import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, readTVarIO, writeTVar, modifyTVar')
 import Control.Monad (foldM)
 import qualified STMContainers.Map as STMap

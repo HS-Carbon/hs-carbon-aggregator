@@ -7,7 +7,6 @@
 -- opcodes to construct a (Haskell representation of a) Python object.
 module Language.Python.Pickle where
 
-import Control.Applicative (Applicative(..), (<$>), (<*), (*>))
 import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.ByteString as S

@@ -11,7 +11,6 @@ module Carbon.Aggregator.Processor (
                                    ) where
 
 import Data.Maybe (mapMaybe, catMaybes)
-import Control.Applicative ((<$>))
 import Control.Concurrent.STM (STM, atomically)
 import qualified STMContainers.Map as STMap
 import ListT (toList)

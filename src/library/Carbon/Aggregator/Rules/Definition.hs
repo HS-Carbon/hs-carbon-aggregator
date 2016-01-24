@@ -7,7 +7,6 @@ module Carbon.Aggregator.Rules.Definition (
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
 import Data.Either.Convenient
-import Control.Applicative
 
 import Carbon.Aggregator
 import Carbon.Aggregator.Rules

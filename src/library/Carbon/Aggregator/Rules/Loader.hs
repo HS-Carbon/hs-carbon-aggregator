@@ -10,7 +10,6 @@ import Carbon.Aggregator.Rules.Definition (parseRuleDefinition)
 import Data.Either (partitionEithers)
 import Data.Tuple (swap)
 import qualified Data.ByteString.Char8 as B
-import Control.DeepSeq (force)
 
 type MalformedDefinition = B.ByteString
 
@@ -20,7 +19,7 @@ loadRules path = do
     let contentLines = B.lines content
     let meaningfulLines = filter meaningful contentLines
     let result = partitionEithers $ map readRule meaningfulLines
-    return . force $ swap result
+    return $! swap result
     where
         meaningful :: B.ByteString -> Bool
         meaningful line = not ("#" `B.isPrefixOf` line || B.null line)

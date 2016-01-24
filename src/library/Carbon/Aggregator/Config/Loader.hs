@@ -7,8 +7,8 @@ module Carbon.Aggregator.Config.Loader (
 import Data.ConfigFile (ConfigParser(..), CPError, CPErrorData(..), emptyCP)
 import qualified Data.ConfigFile as CF
 import Control.Monad (join, when)
-import Control.Monad.Error (runErrorT, liftIO, throwError, MonadError)
-import Control.Applicative ((<$>))
+import Control.Monad.Except (liftIO, throwError, MonadError)
+import Control.Monad.Trans.Except (runExceptT)
 import System.FilePath (takeFileName)
 import Data.Maybe (isNothing, fromJust)
 import Data.List.Split (splitOn)
@@ -27,7 +27,7 @@ getValue cp (Just instanceName) option = do
 
 parseAggregatorConfig :: FilePath -> InstanceName -> IO (Either String CarbonAggregatorConfig)
 parseAggregatorConfig path maybeInstanceName = do
-    econf <- runErrorT $ do
+    econf <- runExceptT $ do
         -- ConfigFile.emptyCP uses 'toLower' as default keys transformation function.
         -- It means it won't be possible to lookup for keys like "LINE_RECEIVER_INTERFACE"
         -- Pass 'id' instead to search exact given key

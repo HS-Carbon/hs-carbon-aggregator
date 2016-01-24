@@ -1,13 +1,19 @@
 language: haskell
-os:
-  - linux
-ghc: 7.8
+ghc: '7.10'
 sudo: false
 
 cache:
   directories:
     - .cabal-sandbox
     - ~/.cabal
+
+addons:
+  apt:
+    sources:
+      - hvr-ghc
+    packages:
+      - alex-3.1.4
+      - happy-1.19.5
 
 before_cache:
   - rm -rf .cabal-sandbox/logs
@@ -16,9 +22,9 @@ before_cache:
 before_install:
   - |-
     if ! grep "split-objs: True" ~/.cabal/config; then echo "split-objs: True" >> ~/.cabal/config; fi
+  - export PATH=/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
   - export PATH=~/.cabal/bin:$PATH
   - cabal sandbox init
-  - cabal install happy alex
   - cabal --version
   - alex --version
   - happy --version

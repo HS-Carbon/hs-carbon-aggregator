@@ -11,10 +11,9 @@ import Language.Python.Pickle
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lex.Double as Lex.Double
+import qualified Data.ByteString.Lex.Fractional as Fractional
 import Data.Binary
 import Data.Maybe
-import Control.Applicative
 import System.IO
 
 readPickled :: Handle -> IO (Maybe [MetricTuple])
@@ -53,7 +52,7 @@ pickleToTimestamp v = fail $ "Unable to parse timestamp from " ++ show v
 pickleToValue :: (Monad m) => Value -> m MetricValue
 -- By default metric value sent as string.
 pickleToValue (BinString svalue) = do
-    case Lex.Double.readDouble svalue of
+    case Fractional.readDecimal svalue of
         Just (value, _rest) -> return value
         Nothing -> fail $ "Unable to parse metric value " ++ show svalue
 pickleToValue (BinFloat value) = return value

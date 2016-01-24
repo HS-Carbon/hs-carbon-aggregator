@@ -19,7 +19,6 @@ import qualified Data.Map as Map
 import Data.IORef
 import Data.Maybe (fromJust)
 import Control.Monad (forM)
-import Control.Applicative ((<$>))
 import Text.Printf
 
 data StatsConfig = StatsConfig {
