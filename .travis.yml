@@ -1,36 +1,31 @@
-language: haskell
-ghc: '7.10'
-sudo: false
+language: c
+sudo: required
+
+services:
+  - docker
 
 cache:
   directories:
     - .cabal-sandbox
-    - ~/.cabal
-
-addons:
-  apt:
-    sources:
-      - hvr-ghc
-    packages:
-      - alex-3.1.4
-      - happy-1.19.5
 
 before_cache:
   - rm -rf .cabal-sandbox/logs
-  - rm -f ~/.cabal/packages/hackage.haskell.org/build-reports.log
 
 before_install:
-  - |-
-    if ! grep "split-objs: True" ~/.cabal/config; then echo "split-objs: True" >> ~/.cabal/config; fi
-  - export PATH=/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
-  - export PATH=~/.cabal/bin:$PATH
-  - cabal sandbox init
-  - cabal --version
-  - alex --version
-  - happy --version
+  - docker run -idt --name ghc-workspace -v $(pwd):/opt/workspace hscarbon/centos-ghc
+
+install:
+  - docker exec -i ghc-workspace /opt/workspace/build/configure.sh
+
+script:
+  - docker exec -i ghc-workspace /opt/workspace/build/build.sh
+  # Restore permissions that could be broken by Docker.
+  - MYNAME=$USER
+  - sudo chown $MYNAME -R .
 
 after_script:
   - strip dist/build/carbon-aggregator/carbon-aggregator
+  - ldd dist/build/carbon-aggregator/carbon-aggregator
 
 before_deploy:
   - mkdir deploy
