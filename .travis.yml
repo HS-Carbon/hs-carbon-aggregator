@@ -1,6 +1,9 @@
 language: c
 sudo: required
 
+env:
+  - DOCKER_IMAGE=hscarbon/centos-ghc ARTIFACT_SUFFIX=centos6
+
 services:
   - docker
 
@@ -12,7 +15,7 @@ before_cache:
   - rm -rf .cabal-sandbox/logs
 
 before_install:
-  - docker run -idt --name ghc-workspace -v $(pwd):/opt/workspace hscarbon/centos-ghc
+  - docker run -idt --name ghc-workspace -v $(pwd):/opt/workspace $DOCKER_IMAGE
 
 install:
   - docker exec -i ghc-workspace /opt/workspace/build/configure.sh
@@ -22,21 +25,22 @@ script:
   # Restore permissions that could be broken by Docker.
   - MYNAME=$USER
   - sudo chown $MYNAME -R .
+  # This command have to be in "script" section because "deploy" gets called before "after_script".
+  - strip dist/build/carbon-aggregator/carbon-aggregator
 
 after_script:
-  - strip dist/build/carbon-aggregator/carbon-aggregator
   - ldd dist/build/carbon-aggregator/carbon-aggregator
 
 before_deploy:
   - mkdir deploy
-  - cp dist/build/carbon-aggregator/carbon-aggregator deploy/carbon-aggregator
+  - cp dist/build/carbon-aggregator/carbon-aggregator deploy/carbon-aggregator-$ARTIFACT_SUFFIX
 
 deploy:
   provider: releases
-  file: deploy/carbon-aggregator
+  file: deploy/carbon-aggregator-$ARTIFACT_SUFFIX
   skip_cleanup: true
   api_key:
     secure: N8Z2fVm2kqfHzpwpNNvjQBg3391NddkISwS0FpHOzULZQf/tusItvWMYXcmdcPBf8XLzoqKXWctWuMrfsLCjLCx6yY7dOMFwpkX7axK74x4ZLX90D7kKTuI+sX7BxBIbRFu0EVUvJVepqeE4rVDU8TfglX/qZHxEp3dvI2zq7nL9G9mHgH9KoHXEV/fPymmdNixxfBRcUC7XtNStRrJj3Eq35nQHqRG0amiLLOkg3yxAoqTY/3kEV6fwEoRInPQtRF8ffOQzrKSjkYuQk7t9fFfSaJYEQy8dO2p05iCEXuM6yaNHDA1aYmuq8MzoHndyIUIsPY9JfvOaj3oOEcNkx7qhimMhyWEvulg+jGhlNuylM+EkEPu6ZummYf9z8tiC7mlaWG56jcjV58XZNAcRbrPJRY7ljSKhyB27+tRDwgbaj9lxFXtSGkwX+PGNsEBxmWkGyqhkp6DS/faFz3XUey9UdiLg52IqSJMCnkxi4Ta30r4bavzuMTEp5Vs5Yw+ItsD2kcWd6BvorUGCQQZTsKeI27ZQRJ2D58DMnb/J9nIo3Z1fVQdDY6GJoFec/5/0H5u3cJxK55CMa7lhUVyqc9d+aqE+xnO1H90V7tHCbf43x/tb00GAJ4JfdxUb3yO/riimqWPL575069eDNIYw63d/xGZKRLojwYBMNUIXJy0=
   on:
-    repo: ratsam/hs-carbon-aggregator
+    repo: HS-Carbon/hs-carbon-aggregator
     tags: true

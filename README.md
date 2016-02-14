@@ -1,6 +1,6 @@
-# hs-carbon-aggregator [![Build Status](https://travis-ci.org/ratsam/hs-carbon-aggregator.svg?branch=master)](https://travis-ci.org/ratsam/hs-carbon-aggregator)
+# hs-carbon-aggregator [![Build Status](https://travis-ci.org/HS-Carbon/hs-carbon-aggregator.svg?branch=master)](https://travis-ci.org/HS-Carbon/hs-carbon-aggregator)
 
-<img src="https://raw.githubusercontent.com/ratsam/hs-carbon-aggregator/master/readme-resources/multicore.jpg" width="250"/>  
+<img src="https://raw.githubusercontent.com/HS-Carbon/hs-carbon-aggregator/master/readme-resources/multicore.jpg" width="250"/>  
 `carbon-aggregator.py` at work
 
 #### Like `carbon-aggregator.py` only multi-threaded.
