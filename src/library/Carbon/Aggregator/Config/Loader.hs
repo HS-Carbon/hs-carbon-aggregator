@@ -34,10 +34,18 @@ parseAggregatorConfig path maybeInstanceName = do
         cp <- join $ liftIO $ CF.readfile emptyCP{optionxform = id} path
 
         let confDir = optional $ getValue cp maybeInstanceName "CONF_DIR"
-        lineReceiverInterface <- getValue cp maybeInstanceName "LINE_RECEIVER_INTERFACE"
-        lineReceiverPort <- getValue cp maybeInstanceName "LINE_RECEIVER_PORT"
-        pickleReceiverInterface <- getValue cp maybeInstanceName "PICKLE_RECEIVER_INTERFACE"
-        pickleReceiverPort <- getValue cp maybeInstanceName "PICKLE_RECEIVER_PORT"
+        let lineReceiverInterface = fromEither
+                                    "0.0.0.0" $
+                                    getValue cp maybeInstanceName "LINE_RECEIVER_INTERFACE"
+        let lineReceiverPort = fromEither
+                                    2023 $
+                                    getValue cp maybeInstanceName "LINE_RECEIVER_PORT"
+        let pickleReceiverInterface = fromEither
+                                    "0.0.0.0" $
+                                    getValue cp maybeInstanceName "PICKLE_RECEIVER_INTERFACE"
+        let pickleReceiverPort = fromEither
+                                    2024 $
+                                    getValue cp maybeInstanceName "PICKLE_RECEIVER_PORT"
         let aggregationRulesPath = fromEither
                                     "aggregation-rules.conf" $
                                     getValue cp maybeInstanceName "AGGREGATION_RULES"
