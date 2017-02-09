@@ -39,7 +39,7 @@ newStatsMap = do
     let trackableStats = [AggregatedDataPoints, DataPointsReceived, BlacklistMatches, WhitelistRejects]
     mapFromKeysM (\_ -> newIORef 0) trackableStats
     where
-        mapFromKeysM :: (Monad m, Functor m, Ord k) => (k -> m v) -> [k] -> m (Map k v)
+        mapFromKeysM :: (Monad m, Ord k) => (k -> m v) -> [k] -> m (Map k v)
         mapFromKeysM f keys = Map.fromList <$> forM keys (\k -> f k >>= \v -> return (k, v))
         {-# SPECIALIZE mapFromKeysM :: (Stat -> IO (IORef Int)) -> [Stat] -> IO (Map Stat (IORef Int)) #-}
 

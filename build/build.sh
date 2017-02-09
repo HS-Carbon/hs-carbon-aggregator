@@ -5,8 +5,11 @@
 
 cd /opt/workspace
 
-export PATH=~/.cabal/bin:$PATH
+stack test --work-dir=.docker-stack-work --allow-different-user
 
-cabal configure -f static-gmp
+stack build --no-test --flag carbon-aggregator:static-gmp --work-dir=.docker-stack-work --allow-different-user
 
-cabal build && cabal test
+mkdir -p dist
+cp $(stack path --dist-dir --work-dir=.docker-stack-work --allow-different-user)/build/carbon-aggregator/carbon-aggregator dist/carbon-aggregator
+rm -rf $(stack path --dist-dir --work-dir=.docker-stack-work --allow-different-user)/build/
+

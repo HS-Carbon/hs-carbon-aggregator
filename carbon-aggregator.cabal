@@ -36,7 +36,8 @@ library
     Carbon.Aggregator.Processor,
     Carbon.Aggregator.Server,
     Carbon.Aggregator.Sink,
-    Carbon.Stats
+    Carbon.Stats,
+    Data.Either.Convenient
   other-modules:
     Carbon.Codec.Pickle.Decode,
     Carbon.Codec.Pickle.Encode,

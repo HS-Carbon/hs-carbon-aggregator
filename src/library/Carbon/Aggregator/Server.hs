@@ -25,7 +25,7 @@ type ServerHandler = Handle -> IO ()
 runTCPServer :: ServerHandler -> (HostAddress, Int) -> IO ()
 runTCPServer handler (host, port) = withSocketsDo $ bracket
     (bindPort host port)
-    (\s -> do putStrLn "Wow-wow, shutting server down!"; sClose s)
+    (\s -> do putStrLn "Wow-wow, shutting server down!"; close s)
     (forever . serve)
     where
         serve ssock = do
@@ -83,7 +83,7 @@ createSocket :: HostAddress -> Int -> IO Socket
 createSocket host port = do
   sock <- NS.socket AF_INET Stream 0
   setSocketOption sock ReuseAddr 1
-  bindSocket sock $ SockAddrInet (fromIntegral port) host
+  bind sock $ SockAddrInet (fromIntegral port) host
   return sock
 
 bindPort :: HostAddress -> Int -> IO Socket

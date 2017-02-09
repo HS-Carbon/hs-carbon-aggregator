@@ -29,15 +29,12 @@ If required you can provide explicit configuration location, i.e. `./hs-carbon-a
 Please let me know if your setup requires any specific configuration options and I'll add them.
 
 ## Building from source
-You will need Haskell and Cabal installed, e.g. from [Haskell Platform](https://www.haskell.org/platform/).  
+You will need Haskell and Cabal installed, e.g. from [Haskell Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/).  
 Then:
 ```bash
 git clone https://github.com/HS-Carbon/hs-carbon-aggregator.git
 cd hs-carbon-aggregator
-cabal update
-cabal sandbox init
-cabal install happy alex
-cabal install --only-dependencies --enable-tests --reorder-goals -j
-cabal build
+stack setup
+stack build
 ```
-Default path for executable is `dist/build/carbon-aggregator/`.
+Default path for executable is `$(stack path --dist-dir)/build/carbon-aggregator/`.

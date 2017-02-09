@@ -9,10 +9,10 @@ services:
 
 cache:
   directories:
-    - .cabal-sandbox
+    - .docker-stack-work
 
 before_cache:
-  - rm -rf .cabal-sandbox/logs
+  - rm -rf .docker-stack-work/logs
 
 before_install:
   - docker run -idt --name ghc-workspace -v $(pwd):/opt/workspace $DOCKER_IMAGE
@@ -26,14 +26,14 @@ script:
   - MYNAME=$USER
   - sudo chown $MYNAME -R .
   # This command have to be in "script" section because "deploy" gets called before "after_script".
-  - strip dist/build/carbon-aggregator/carbon-aggregator
+  - strip dist/carbon-aggregator
 
 after_script:
-  - ldd dist/build/carbon-aggregator/carbon-aggregator
+  - ldd dist/carbon-aggregator
 
 before_deploy:
   - mkdir deploy
-  - cp dist/build/carbon-aggregator/carbon-aggregator deploy/carbon-aggregator-$ARTIFACT_SUFFIX
+  - cp dist/carbon-aggregator deploy/carbon-aggregator-$ARTIFACT_SUFFIX
 
 deploy:
   provider: releases
