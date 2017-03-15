@@ -35,6 +35,9 @@ main = AggregatorOptions.withOptionsDo $ \options -> do
             putStrLn errorMsg
             putStrLn "You can find more about configuration files here: http://graphite.readthedocs.org/en/latest/config-carbon.html"
         Right (confPath, conf) -> do
+            case instanceName of
+                Nothing -> putStrLn $ "Loading configuration for default carbon-aggregator instance from '" ++ confPath ++ "'."
+                Just instanceName' -> putStrLn $ "Loading configuration for carbon-aggregator instance '" ++ instanceName' ++ "' from '" ++ confPath ++ "'."
             proceedWithConfig (combine confPath) instanceName conf
 
 -- Resolve order:   option (--config=carbon.conf)
@@ -99,6 +102,7 @@ proceedWithConfig confPath instanceName conf = do
         Stats.hostname = serverHostName,
         Stats.instanceName = instanceName
     }
+    putStrLn $ "Collecting self metrics with prefix '" ++ (Stats.metricPrefix statsConfig) ++ "'"
     forkIO . forever $ do
         now <- round `fmap` getPOSIXTime
         metrics <- Stats.collectSelfStatsIO statsConfig smap bm now
