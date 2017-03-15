@@ -5,6 +5,7 @@ module Carbon.Aggregator.Options (
                                  ) where
 
 import Options.Applicative
+import Data.Semigroup ((<>))
 
 data AggregatorOptions = AggregatorOptions
     { configPath   :: Maybe FilePath
