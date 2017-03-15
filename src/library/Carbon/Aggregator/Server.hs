@@ -82,6 +82,7 @@ createSocket :: HostAddress -> Int -> IO Socket
 createSocket host port = do
   sock <- NS.socket AF_INET Stream 0
   setSocketOption sock ReuseAddr 1
+  setSocketOption sock NoDelay 1
   bind sock $ SockAddrInet (fromIntegral port) host
   return sock
 
