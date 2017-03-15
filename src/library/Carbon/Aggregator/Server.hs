@@ -88,7 +88,8 @@ createSocket host port = do
 bindPort :: HostAddress -> Int -> IO Socket
 bindPort host port = do
     sock <- createSocket host port
-    listen sock (max 2048 maxListenQueue)
+    putStrLn $ "Starting server on port " ++ (show port) ++ " with max " ++ (show maxListenQueue) ++ " connections (capped by SOMAXCONN)."
+    listen sock maxListenQueue
     return sock
 
 acceptSafe :: Socket -> IO (Socket, SockAddr)
