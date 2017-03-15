@@ -25,7 +25,7 @@ type ServerHandler = Handle -> IO ()
 runTCPServer :: ServerHandler -> (HostAddress, Int) -> IO ()
 runTCPServer handler (host, port) = withSocketsDo $ bracket
     (bindPort host port)
-    (\s -> do putStrLn "Wow-wow, shutting server down!"; close s)
+    (\s -> do putStrLn "Shutting server down!"; close s)
     (forever . serve)
     where
         serve ssock = do
@@ -36,14 +36,13 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
 handlePlainTextConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
 handlePlainTextConnection reportMetricsCount rules outchan bm h = do
-    putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
+    putStrLn $ "Accepted connection. Expecting plain text metrics, consider migrating to Pickle. Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h LineBuffering
     loop
     where
         loop :: IO ()
         loop = do
             line <- B.hGetLine h
-            putStrLn $ "Got the " ++ show line
             -- TODO: log connection? increment counter?
             let mm = decodePlainText line
             case mm of
@@ -62,7 +61,7 @@ handlePlainTextConnection reportMetricsCount rules outchan bm h = do
 
 handlePickleConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
 handlePickleConnection reportMetricsCount rules outchan bm h = do
-    putStrLn $ "Wow! such connection! Processing with " ++ (show $ length rules) ++ " rule(s)."
+    putStrLn $ "Accepted connection. Expecting Pickle-encoded metrics. Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h NoBuffering
     loop
     where
@@ -70,7 +69,7 @@ handlePickleConnection reportMetricsCount rules outchan bm h = do
         loop = do
             mmtuples <- readPickled h
             case mmtuples of
-                Nothing -> putStrLn "Could not parse message"
+                Nothing -> putStrLn "Could not parse Pickle-encoded message"
                 Just mtuples -> do
                     reportMetricsCount $ length mtuples
                     outm <- processAggregateManyIO rules bm mtuples
