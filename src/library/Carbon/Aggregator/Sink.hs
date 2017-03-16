@@ -70,6 +70,6 @@ reconnectingConnect maxDelay serverAddr = do
             connect sock (addrAddress serverAddr)
             return sock
             `catch` \(e :: IOError) -> do
-                print e
+                putStrLn $ "Error connecting to carbon-cache on " ++ show (addrAddress serverAddr) ++ ", retrying in " ++ show currentDelay ++ " sec; error was: " ++ show e
                 threadDelay $ currentDelay * 1000000
-                connectInternal $ max (currentDelay + 1) maxDelay
+                connectInternal $ min (currentDelay + 1) maxDelay
