@@ -68,7 +68,7 @@ library
     split,
     network
   ghc-prof-options: -auto-all -prof
-  ghc-options: -Wall -Werror -fno-warn-unused-do-bind
+  ghc-options:         -Wall -Werror -O -fno-warn-unused-do-bind -fwarn-missing-signatures -funbox-strict-fields
   hs-source-dirs:      src/library, 3rd-party/python-pickle
   default-language:    Haskell2010
 
@@ -87,7 +87,7 @@ executable carbon-aggregator
                        stm
   hs-source-dirs:      src/daemon
   default-language:    Haskell2010
-  ghc-options:         -threaded -O2 -with-rtsopts=-N
+  ghc-options:         -threaded -O -O2 "-with-rtsopts=-N -Nmax -S" -fwarn-missing-signatures -funbox-strict-fields
   if flag(static-gmp)
     -- GHC option below is used to workaroung GHC limitations.
     -- We provide custom script in order to statically link GMP.so,
