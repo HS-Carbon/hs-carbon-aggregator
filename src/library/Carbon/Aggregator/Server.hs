@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Exception
 import Control.Concurrent
 import System.IO
+import System.CPUTime
 import Control.Concurrent.STM
 import Carbon
 import Carbon.Decoder
@@ -31,7 +32,10 @@ runTCPServer handler (host, port) = withSocketsDo $ bracket
         serve ssock = do
             (sock, _) <- acceptSafe ssock
             h <- socketToHandle sock ReadMode
-            forkFinally (handler h) (\e -> do putStrLn "Client gone..."; print e; hClose h)
+            forkFinally (handler h) (\e -> doFinally e >> hClose h)
+        doFinally :: Either SomeException a -> IO ()
+        doFinally (Right _) = return ()
+        doFinally (Left e) = print e
 
 -- This is the only method related to Carbon. Should I extract everything else to dedicated module?
 handlePlainTextConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
@@ -61,19 +65,32 @@ handlePlainTextConnection reportMetricsCount rules outchan bm h = do
 
 handlePickleConnection :: (Int -> IO ()) -> [Rule] -> TChan [MetricTuple] -> BuffersManager -> ServerHandler
 handlePickleConnection reportMetricsCount rules outchan bm h = do
-    putStrLn $ "Accepted connection. Expecting Pickle-encoded metrics. Processing with " ++ (show $ length rules) ++ " rule(s)."
+    putStrLn $ "Accepted Pickle-encoded connection. Processing with " ++ (show $ length rules) ++ " rule(s)."
     hSetBuffering h NoBuffering
     loop
     where
         loop :: IO ()
         loop = do
+            currentThreadId <- myThreadId
+            readTimeStart <- getCPUTime
+
             mmtuples <- readPickled h
+
+            readTimeEnd <- getCPUTime
+            putStrLn $ (show currentThreadId) ++ " spent " ++ (show $ (readTimeEnd - readTimeStart) `quot` 1000000000) ++ " ms unpickling metrics"
+
             case mmtuples of
                 Nothing -> putStrLn "Could not parse Pickle-encoded message"
                 Just mtuples -> do
+                    -- we can actually fork here to let server proceed with next batch of metrics
+                    processTimeStart <- getCPUTime
+
                     reportMetricsCount $ length mtuples
                     outm <- processAggregateManyIO rules bm mtuples
                     atomically $ writeTChan outchan outm
+
+                    processTimeEnd <- getCPUTime
+                    putStrLn $ (show currentThreadId) ++ " processed " ++ (show $ length mtuples) ++ " metric tuples in " ++ (show $ ( processTimeEnd - processTimeStart ) `quot` 1000000000) ++ " milliseconds."
 
             hEof <- hIsEOF h
             unless hEof loop
