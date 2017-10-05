@@ -24,10 +24,10 @@ import Carbon.Aggregator.Buffer
 processAggregateManyIO :: [Rule] -> BuffersManager -> [MetricTuple] -> IO [MetricTuple]
 processAggregateManyIO rules bm mtuples = do
     let (actionss, moutms) = unzip $ map (processAggregate rules bm) mtuples
-    mapM_ atomically $ concat actionss
+    sequence_ $ concat actionss
     return $ catMaybes moutms
 
-processAggregate :: [Rule] -> BuffersManager -> MetricTuple -> ([STM ()], (Maybe MetricTuple))
+processAggregate :: [Rule] -> BuffersManager -> MetricTuple -> ([IO ()], (Maybe MetricTuple))
 processAggregate rules bm mtuple@(MetricTuple metric dp) = do
     -- TODO: rewrite rules PRE
 
@@ -46,7 +46,7 @@ processAggregate rules bm mtuple@(MetricTuple metric dp) = do
 
         applyAggregationRule (metricName, rule) = processAggregateRule rule bm metricName dp
 
-processAggregateRule :: Rule -> BuffersManager -> AggregatedMetricName -> DataPoint -> STM ()
+processAggregateRule :: Rule -> BuffersManager -> AggregatedMetricName -> DataPoint -> IO ()
 processAggregateRule rule bm metric dp = do
     buf <- getBufferRef bm (metric, rule)
     appendDataPoint buf dp
@@ -61,10 +61,10 @@ collectAggregatedIO maxBuckets now bm = do
             dps <- computeAggregatedIO maxBuckets now mbufs
             return [MetricTuple mpath p | p <- dps]
 
-getBufferRef :: BuffersManager -> (AggregatedMetricName, Rule) -> STM MetricBuffers
+getBufferRef :: BuffersManager -> (AggregatedMetricName, Rule) -> IO MetricBuffers
 getBufferRef bm (mpath, rule) = do
     buf <- createBuffer
-    STMap.focus (insertIfNotExistsM buf) mpath bm
+    atomically $ STMap.focus (insertIfNotExistsM buf) mpath bm
     where
         createBuffer = bufferFor mpath ruleFrequency ruleMethod
         ruleFrequency = ruleAggregationFrequency rule

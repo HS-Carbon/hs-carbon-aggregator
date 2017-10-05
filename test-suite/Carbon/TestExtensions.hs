@@ -2,7 +2,7 @@
 
 module Carbon.TestExtensions () where
 
-import Control.Concurrent.STM
+import Data.IORef (IORef, readIORef)
 import System.IO.Unsafe
 
 import Carbon
@@ -14,6 +14,6 @@ deriving instance Show MetricTuple
 deriving instance Eq MetricTuple
 deriving instance Eq Rule
 
-instance (Show a) => Show (TVar a) where
+instance (Show a) => Show (IORef a) where
     -- Holi macaroni, you shound't have seen it!
-    show t = "TVar<" ++ (show $ unsafePerformIO (readTVarIO t)) ++ ">"
+    show ref = "IORef<" ++ (show $ unsafePerformIO (readIORef ref)) ++ ">"

@@ -54,7 +54,7 @@ handlePlainTextConnection reportMetricsCount rules outchan bm h = do
                     reportMetricsCount 1
 
                     let (actions, mmetric') = processAggregate rules bm metric
-                    mapM_ atomically actions
+                    sequence_ actions
                     case mmetric' of
                         Just metric' -> atomically $ writeTChan outchan [metric']
                         Nothing -> return ()

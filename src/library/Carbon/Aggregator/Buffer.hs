@@ -15,28 +15,29 @@ module Carbon.Aggregator.Buffer (
 import Carbon
 import Carbon.Aggregator (AggregationFrequency, AggregationMethod(..))
 import Data.Map.Strict (Map)
+import Data.IORef
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes)
-import Control.Concurrent.STM (atomically, STM, TVar, newTVar, readTVar, readTVarIO, writeTVar, modifyTVar')
+import Control.Concurrent.STM (atomically, STM)
 import Control.Monad (foldM)
+import Control.Monad.Extra (mapMaybeM)
 import qualified STMContainers.Map as STMap
 import ListT (toList)
 
 type Interval = Int
 type Buffer = (Bool, [MetricValue])
-type IntervalBuffers = Map Interval (TVar Buffer)
+type IntervalBuffers = Map Interval (IORef Buffer)
 data MetricBuffers = MetricBuffers {
     path :: MetricPath,
     frequency :: AggregationFrequency,
     aggregationMethod :: AggregationMethod,
-    intervalBuffers :: TVar IntervalBuffers
+    intervalBuffers :: IORef IntervalBuffers
 }
 
 type BuffersManager = STMap.Map MetricPath MetricBuffers
 
-bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> STM MetricBuffers
+bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> IO MetricBuffers
 bufferFor path freq aggmethod = do
-    intervallBuffers <- newTVar Map.empty
+    intervallBuffers <- newIORef Map.empty
     return $ MetricBuffers path freq aggmethod intervallBuffers
 
 newBuffersManager :: STM BuffersManager
@@ -54,61 +55,72 @@ countBufferedDataPoints bm = foldM accumBufferManagerDps 0 =<< streamBuffers bm
         streamBuffers = atomically . toList . STMap.stream
         accumBufferManagerDps :: Int -> (MetricPath, MetricBuffers) -> IO Int
         accumBufferManagerDps r (_, metricBuffers) = do
-            intervalBuffers' <- readTVarIO $ intervalBuffers metricBuffers
-            buffers' <- sequence $ readTVarIO <$> Map.elems intervalBuffers'
+            intervalBuffers' <- readIORef $ intervalBuffers metricBuffers
+            buffers' <- sequence $ readIORef <$> Map.elems intervalBuffers'
             let bufferredDps = sum $ map (\(_, dps) -> length dps) buffers'
             return $! r + bufferredDps
 
-appendDataPoint :: MetricBuffers -> DataPoint -> STM ()
+appendDataPoint :: MetricBuffers -> DataPoint -> IO ()
 appendDataPoint MetricBuffers{..} dp = appendBufferDataPoint frequency dp intervalBuffers
 
-appendBufferDataPoint :: AggregationFrequency -> DataPoint -> TVar IntervalBuffers -> STM ()
-appendBufferDataPoint freq (DataPoint timestamp value) tbufs = do
-    -- TODO: can be improved with custom "insertOrUpdate" Map function.
-    bufs <- readTVar tbufs
-    case Map.lookup interval bufs of
-        Just (tBuf) -> do
-            modifyTVar' tBuf $ appendBufferValue value
+appendBufferDataPoint :: AggregationFrequency -> DataPoint -> IORef IntervalBuffers -> IO ()
+appendBufferDataPoint freq (DataPoint timestamp value) intervalBuffersRef = do
+    let interval = timestamp `quot` freq
+    intervalBuffers <- readIORef intervalBuffersRef
+    case Map.lookup interval intervalBuffers of
+        Just bufRef -> do
+            -- TODO: test preformance with strict and non-strict versions of atomicModifyIORef
+            atomicModifyIORef' bufRef (modifyBuf value)
         Nothing -> do
-            tBuf <- newTVar (True, [value])
-            writeTVar tbufs $! Map.insert interval tBuf bufs
-    where interval = timestamp `quot` freq
+            newBufRef <- newIORef (False, [])
+            bufRef <- atomicModifyIORef' intervalBuffersRef (lookupOrInsert interval newBufRef)
+            -- TODO: test preformance with strict and non-strict versions of atomicModifyIORef
+            atomicModifyIORef' bufRef (modifyBuf value)
+    return ()
+    where
+        lookupOrInsert :: Interval -> IORef Buffer -> IntervalBuffers -> (IntervalBuffers, IORef Buffer)
+        lookupOrInsert interval newBufRef intervalBuffers = case Map.lookup interval intervalBuffers of
+            Just bufRef -> (intervalBuffers, bufRef)
+            Nothing -> (Map.insert interval newBufRef intervalBuffers, newBufRef)
+
+        modifyBuf :: MetricValue -> Buffer -> (Buffer, Buffer)
+        modifyBuf val buf = mktuple $ appendBufferValue val buf
+
+mktuple :: a -> (a, a)
+mktuple a = (a, a)
 
 appendBufferValue :: MetricValue -> Buffer -> Buffer
 appendBufferValue val (_, oldVals) = (True, val : oldVals)
 
 computeAggregatedIO :: Int -> Timestamp -> MetricBuffers -> IO [DataPoint]
 computeAggregatedIO maxIntervals now mbufs@MetricBuffers{..} = do
-    freshBufs <- atomically $ splitBuffersT maxIntervals now mbufs
+    freshBufs <- splitBuffers maxIntervals now mbufs
     if Map.null $ freshBufs
         then
             return []
-        else do
-            maybeDps <- mapM atomically $ computeAggregateBuffersT frequency aggregationMethod freshBufs
-            let dps = catMaybes maybeDps
-            return dps
+        else
+            computeAggregateBuffers frequency aggregationMethod freshBufs
 
 -- | Update 'MetricBuffers' *in place* and return "fresh" buffers, silently dropping outdated ones
-splitBuffersT :: Int -> Timestamp -> MetricBuffers -> STM IntervalBuffers
-splitBuffersT maxIntervals now MetricBuffers{..} = do
+splitBuffers :: Int -> Timestamp -> MetricBuffers -> IO IntervalBuffers
+splitBuffers maxIntervals now MetricBuffers{..} = do
     let currentInterval = now `quot` frequency
     let thresholdInterval = currentInterval - maxIntervals
-    -- Split buffers into those that passed age threshold and those that didn't.
-    (_outdatedBufs, freshBufs) <- Map.split thresholdInterval <$> readTVar intervalBuffers
-    writeTVar intervalBuffers $! freshBufs
-    return freshBufs
-
-computeAggregateBuffersT :: AggregationFrequency -> AggregationMethod -> IntervalBuffers -> [STM (Maybe DataPoint)]
-computeAggregateBuffersT frequency aggregationMethod bufs = map processBuffer $ Map.assocs bufs
+    atomicModifyIORef' intervalBuffers (mktuple <$> dropOutdatedIntervals thresholdInterval)
     where
-        processBuffer :: (Interval, TVar Buffer) -> STM (Maybe DataPoint)
-        processBuffer (interval, tbuf) = do
-            buf <- readTVar tbuf
-            case buf of
-                (False, _) -> return Nothing
-                (True, vals) -> do
-                    writeTVar tbuf (False, vals)
-                    return . Just $! bufferDp (interval * frequency) vals
+        dropOutdatedIntervals :: Interval -> IntervalBuffers -> IntervalBuffers
+        dropOutdatedIntervals thresholdInterval bufs = snd $ Map.split thresholdInterval bufs
+
+computeAggregateBuffers :: AggregationFrequency -> AggregationMethod -> IntervalBuffers -> IO [DataPoint]
+computeAggregateBuffers frequency aggregationMethod bufs =
+    mapMaybeM processBuffer $ Map.assocs bufs
+    where
+        processBuffer :: (Interval, IORef Buffer) -> IO (Maybe DataPoint)
+        processBuffer (interval, bufref) = atomicModifyIORef' bufref (calculateIfChanged interval)
+
+        calculateIfChanged :: Interval -> Buffer -> (Buffer, Maybe DataPoint)
+        calculateIfChanged _ buf@(False, _) = (buf, Nothing)
+        calculateIfChanged interval (True, vals) = ((False, vals), Just $! bufferDp (interval * frequency) vals)
 
         bufferDp :: Timestamp -> [MetricValue] -> DataPoint
         bufferDp time vals = DataPoint time (aggreagte vals)

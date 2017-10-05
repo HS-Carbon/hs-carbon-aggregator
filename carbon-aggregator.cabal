@@ -57,6 +57,7 @@ library
     stringsearch,
     containers,
     transformers,
+    extra,
     ConfigFile,
     cereal,
     mtl,
@@ -87,7 +88,7 @@ executable carbon-aggregator
                        stm
   hs-source-dirs:      src/daemon
   default-language:    Haskell2010
-  ghc-options:         -threaded -O -O2 "-with-rtsopts=-N -Nmax -S" -fwarn-missing-signatures -funbox-strict-fields
+  ghc-options:         -threaded -O -O2 -with-rtsopts=-N -fwarn-missing-signatures -funbox-strict-fields
   if flag(static-gmp)
     -- GHC option below is used to workaroung GHC limitations.
     -- We provide custom script in order to statically link GMP.so,
@@ -118,6 +119,7 @@ test-suite tests
     stringsearch,
     split,
     containers,
+    extra,
     cereal,
     mtl,
     stm,
