@@ -50,6 +50,15 @@ spec = do
             appendDataPoint metricBuf $ DataPoint 103 24
             computeAggregatedIO 5 122 metricBuf `shouldReturn` [DataPoint 100 66]
 
+        it "emits single data point per interval (even if new data added)" $ do
+            metricBuf <- makeMetricBuf
+            computeAggregatedIO 5 112 metricBuf
+            appendDataPoint metricBuf $ DataPoint 103 24
+            -- aggregation calls during same interval return nothing
+            computeAggregatedIO 5 113 metricBuf `shouldReturn` []
+            -- once interval has changed, we must emit updated data point
+            computeAggregatedIO 5 122 metricBuf `shouldReturn` [DataPoint 100 66]
+
         it "emits data point per interval" $ do
             metricBuf <- makeMetricBuf
             appendDataPoint metricBuf $ DataPoint 110 24

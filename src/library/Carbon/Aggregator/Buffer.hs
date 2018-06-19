@@ -30,6 +30,7 @@ data MetricBuffers = MetricBuffers {
     path :: MetricPath,
     frequency :: AggregationFrequency,
     aggregationMethod :: AggregationMethod,
+    lastAggregationTimeRef :: IORef Timestamp,
     intervalBuffers :: IORef IntervalBuffers
 }
 
@@ -38,7 +39,8 @@ type BuffersManager = STMap.Map MetricPath MetricBuffers
 bufferFor :: MetricPath -> AggregationFrequency -> AggregationMethod -> IO MetricBuffers
 bufferFor path freq aggmethod = do
     intervallBuffers <- newIORef Map.empty
-    return $ MetricBuffers path freq aggmethod intervallBuffers
+    lastAggregationTimeRef <- newIORef 0
+    return $ MetricBuffers path freq aggmethod lastAggregationTimeRef intervallBuffers
 
 newBuffersManager :: STM BuffersManager
 newBuffersManager = STMap.new
@@ -94,12 +96,18 @@ appendBufferValue val (_, oldVals) = (True, val : oldVals)
 
 computeAggregatedIO :: Int -> Timestamp -> MetricBuffers -> IO [DataPoint]
 computeAggregatedIO maxIntervals now mbufs@MetricBuffers{..} = do
-    freshBufs <- splitBuffers maxIntervals now mbufs
-    if Map.null $ freshBufs
-        then
-            return []
+    lastAggregationTime <- readIORef lastAggregationTimeRef
+    if lastAggregationTime + frequency <= now
+        then do
+            freshBufs <- splitBuffers maxIntervals now mbufs
+            if Map.null $ freshBufs
+                then
+                    return []
+                else do
+                    writeIORef lastAggregationTimeRef now
+                    computeAggregateBuffers frequency aggregationMethod freshBufs
         else
-            computeAggregateBuffers frequency aggregationMethod freshBufs
+            return []
 
 -- | Update 'MetricBuffers' *in place* and return "fresh" buffers, silently dropping outdated ones
 splitBuffers :: Int -> Timestamp -> MetricBuffers -> IO IntervalBuffers
